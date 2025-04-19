@@ -7,21 +7,22 @@ const cors = require("cors");
 const app = express();
 
 // CORS Configuration
-app.use(
-  cors({
-    origin: "http://localhost:3000",
-    methods: "GET,POST,PUT,DELETE",
-    allowedHeaders: "Content-Type",
-  })
-);
-
+// app.use(
+//   cors({
+//     origin: "http://localhost:3000",
+//     methods: "GET,POST,PUT,DELETE",
+//     allowedHeaders: "Content-Type",
+//   })
+// );
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 app.use("/reports", express.static(path.join(__dirname, "reports")));
 // MongoDB Connection
 const MONGO_URI =
-  process.env.MONGO_URI || "mongodb+srv://tanishqworkk:QTDGb4FeghleAQeZ@cluster0.6yzgqyv.mongodb.net/mending?retryWrites=true&w=majority&appName=Cluster0";
+  process.env.MONGO_URI ||
+  "mongodb+srv://tanishqworkk:QTDGb4FeghleAQeZ@cluster0.6yzgqyv.mongodb.net/mending?retryWrites=true&w=majority&appName=Cluster0";
 
 mongoose
   .connect(MONGO_URI, {
@@ -41,11 +42,9 @@ const game = require("./routes/admin/game");
 app.use("/api/doctor", doctor);
 app.use("/api/game", game);
 
-
 //Doctor route
 const session = require("./routes/doctor/session");
 app.use("/api/doctor", session);
-
 
 //user route
 const user = require("./routes/user/user");
