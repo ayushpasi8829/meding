@@ -5,6 +5,7 @@ const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
 
+
 exports.submitAnswer = async (req, res) => {
   const userId = req.user?.id;
   const { questionId, answer } = req.body;
@@ -24,9 +25,7 @@ exports.submitAnswer = async (req, res) => {
   try {
     const question = await QuizQuestion.findById(questionId);
     if (!question) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Question not found" });
+      return res.status(404).json({ success: false, message: "Question not found" });
     }
 
     const existingAnswer = await UserAnswer.findOne({
@@ -64,19 +63,16 @@ exports.submitAnswer = async (req, res) => {
   }
 };
 
+
 exports.generatePdfReport = async (req, res) => {
   const userId = req.user?.id;
 
   try {
     const user = await User.findById(userId);
-    const answers = await UserAnswer.find({ user: userId }).populate(
-      "question"
-    );
+    const answers = await UserAnswer.find({ user: userId }).populate("question");
 
     if (!answers.length) {
-      return res
-        .status(400)
-        .json({ success: false, message: "No answers found" });
+      return res.status(400).json({ success: false, message: "No answers found" });
     }
 
     // 🔍 Basic Scoring
@@ -98,7 +94,7 @@ exports.generatePdfReport = async (req, res) => {
     if (!fs.existsSync(reportsDir)) {
       fs.mkdirSync(reportsDir, { recursive: true });
     }
-
+    
     const fileName = `mental_health_report_${user._id}.pdf`;
     const filePath = path.join(reportsDir, fileName);
 
@@ -126,9 +122,7 @@ exports.generatePdfReport = async (req, res) => {
     doc.fontSize(16).text("Question-wise Summary", { underline: true });
     answers.forEach((ans, index) => {
       doc.fontSize(12).text(`${index + 1}. ${ans.question.question}`);
-      doc
-        .font("Helvetica-Bold")
-        .text(`→ Your Answer: ${ans.answer}`, { indent: 20 });
+      doc.font("Helvetica-Bold").text(`→ Your Answer: ${ans.answer}`, { indent: 20 });
       doc.moveDown(0.5);
     });
 
@@ -138,26 +132,11 @@ exports.generatePdfReport = async (req, res) => {
       res.status(200).json({
         success: true,
         message: "Report generated successfully",
-        url: `/reports/${fileName}`,
+        url: `/reports/${fileName}`, 
       });
     });
   } catch (err) {
     console.error("PDF Report Error:", err);
     res.status(500).json({ success: false, message: "Server Error" });
-  }
-};
-
-exports.getQuestions = async (req, res) => {
-  try {
-    const questions = await QuizQuestion.find();
-    res.status(200).json({ success: true, data: questions });
-  } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch questions",
-        error: error.message,
-      });
   }
 };

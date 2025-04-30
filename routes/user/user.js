@@ -10,18 +10,9 @@ const {
 
 const router = express.Router();
 
-router.get(
-  "/category/get",
-  verifyToken,
-  isUser,
-  userController.getTherapyCategories
-);
-router.post(
-  "/category/select",
-  verifyToken,
-  isUser,
-  userController.selectCategory
-);
+router.post("/therapy-flow", verifyToken, isUser, userController.therapyFlow );
+router.post("/therapy-general-question", verifyToken, isUser, userController.therapyGeneralQuestions );
+router.post("/therapy/step3", verifyToken, isUser, userController.updateStep3TherapyDetails );
 
 router.get(
   "/session/request",
@@ -33,16 +24,9 @@ router.get(
 router.post("/add-plan", planController.addPlan);
 
 router.post("/select-plan", verifyToken, isUser, planController.selectPlan);
-router.get(
-  "/get-selectedplan",
-  verifyToken,
-  isUser,
-  planController.getSelectedPlan
+router.get("/get-selectedplan", verifyToken, isUser, planController.getSelectedPlan
 );
 
 router.get(
-  "/get-plans",
-
-  planController.getAllPlans
-);
+  "/get-plans", planController.getAllPlans);
 module.exports = router;

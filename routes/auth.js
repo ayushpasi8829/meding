@@ -5,6 +5,7 @@ const { verifyToken, isDoctor, isAdmin, isUser } = require("../middleware/authMi
 const router = express.Router();
 
 router.post("/register", authController.signup);
+router.post("/verify-otp", authController.otpVerify);
 
 router.post("/doctor/register", authController.doctorSignup);
 
