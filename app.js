@@ -43,9 +43,10 @@ app.use("/api/doctor", session);
 //user route
 const user = require("./routes/user/user");
 const gameanswer = require("./routes/user/game");
+const appointment = require("./routes/appointmentRoute");
 app.use("/api/user", user);
 app.use("/api/game", gameanswer);
-
+app.use("/api/appointment", appointment);
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);

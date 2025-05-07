@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
   mobile: { type: String, required: true, unique: true },
   countryCode: { type: String, required: true },
   role: { type: String, enum: ["doctor", "admin", "user"], required: true },
-  location: { type: String, required: true },
+  location: { type: String },
   reason: {
     type: String,
     enum: [
@@ -15,9 +15,9 @@ const userSchema = new mongoose.Schema({
       "Corporate Wellness",
       "Community Initiatives",
       "Internships",
-      "Not Sure"
+      "Not Sure",
     ],
-    required: true
+    // required: true
   },
   therapy: {
     type: {
@@ -28,36 +28,44 @@ const userSchema = new mongoose.Schema({
         "Family Therapy",
         "Child Therapy",
         "Group Therapy",
-        "Not Sure"
+        "Not Sure",
       ],
-      default: null
+      default: null,
     },
     concern: { type: String, default: null },
     mode: {
       type: String,
       enum: ["Online", "Offline", "Hybrid"],
-      default: null
+      default: null,
     },
     age: { type: Number, default: null },
     language: {
       type: String,
       enum: ["Hindi", "English", "Both"],
-      default: null
+      default: null,
     },
     timeline: {
       type: String,
       enum: ["Immediately", "Within a week", "This month", "Just exploring"],
-      default: null
+      default: null,
     },
     step3: {
       whatBringsYouToTherapy: { type: String, default: null },
       individualConcerns: [{ type: String }],
-      areBothPartnersWilling: { type: String, enum: ["Yes", "No", null], default: null },
+      areBothPartnersWilling: {
+        type: String,
+        enum: ["Yes", "No", null],
+        default: null,
+      },
       coupleConcerns: [{ type: String }],
       sessionParticipants: { type: String, default: null },
       familyConcerns: [{ type: String }],
       childBehaviors: { type: String, default: null },
-      childAttendingSchool: { type: String, enum: ["Yes", "No", null], default: null },
+      childAttendingSchool: {
+        type: String,
+        enum: ["Yes", "No", null],
+        default: null,
+      },
       childEducationLevel: {
         type: String,
         enum: [
@@ -67,17 +75,21 @@ const userSchema = new mongoose.Schema({
           "Middle",
           "High School",
           "Not attending",
-          null
+          null,
         ],
-        default: null
-      }
-    }
-  },  
-  availability: {
-    startTime: { type: String, default: null }, 
-    endTime: { type: String, default: null }
+        default: null,
+      },
+    },
   },
-  firstTherapyStatus: { type: String, enum: ["pending", "done"], default: null },
+  availability: {
+    startTime: { type: String, default: null },
+    endTime: { type: String, default: null },
+  },
+  firstTherapyStatus: {
+    type: String,
+    enum: ["pending", "done"],
+    default: null,
+  },
   selectedPlan: { type: String, default: null },
   otp: { type: String, required: false },
   otpExpiresAt: { type: Date, required: false },
