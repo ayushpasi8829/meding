@@ -9,18 +9,18 @@ const {
 const router = express.Router();
 
 router.post(
-  "/create-timeslots",
+  "/createorupdate-timeslots",
   verifyToken,
   isDoctor,
-  appointmentController.createTimeSlots
+  appointmentController.addOrUpdateTimeSlots
 );
-
-router.get("/get-timeslot-toselect", appointmentController.getDummyTimeSlots);
 
 router.get(
-  "/get-Available-timeslots",
-  appointmentController.getAvailableUniqueSlots
+  "/get-timeslot-toselectbydoctor",
+  appointmentController.getThirtyMinSlotsWithBreaks
 );
+
+router.get("/get-Available-timeslots", appointmentController.getAvailableSlots);
 
 router.post(
   "/book-appointment",
@@ -28,4 +28,6 @@ router.post(
   isUser,
   appointmentController.bookAppointment
 );
+
+router.get("/get-doctors", appointmentController.getDoctorsForSlot);
 module.exports = router;

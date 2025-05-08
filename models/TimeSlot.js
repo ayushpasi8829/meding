@@ -1,39 +1,35 @@
 const mongoose = require("mongoose");
 
-const timeSlotSchema = new mongoose.Schema({
+// Slot schema: each slot has a start and end time in 24-hour format
+const slotSchema = new mongoose.Schema(
+  {
+    startTime: {
+      type: String,
+      required: true,
+      // Validates "HH:mm" 24-hour format
+      match: /^([01]\d|2[0-3]):([0-5]\d)$/,
+    },
+    endTime: {
+      type: String,
+      required: true,
+      match: /^([01]\d|2[0-3]):([0-5]\d)$/,
+    },
+  },
+  { _id: false }
+);
+
+const doctorTimeSlotSchema = new mongoose.Schema({
   doctor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
+    // Optionally, you can restrict to users with role: "doctor" in your logic
   },
-  date: {
-    type: Date,
+  slots: {
+    type: [slotSchema],
     required: true,
-  },
-  startTime: {
-    type: Date,
-    required: true,
-  },
-  endTime: {
-    type: Date,
-    required: true,
-  },
-  isBooked: {
-    type: Boolean,
-    default: false,
-  },
-  status: {
-    type: String,
-    enum: ["available", "booked", "completed", "cancelled", "no-show"],
-    default: "available",
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
+    validate: [(slots) => slots.length > 0, "At least one slot is required"],
   },
 });
 
-// Compound index to ensure doctor doesn't create overlapping slots
-timeSlotSchema.index({ doctor: 1, date: 1, startTime: 1 }, { unique: true });
-
-module.exports = mongoose.model("TimeSlot", timeSlotSchema);
+module.exports = mongoose.model("DoctorTimeSlot", doctorTimeSlotSchema);

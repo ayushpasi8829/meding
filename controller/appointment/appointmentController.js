@@ -1,309 +1,339 @@
-const TimeSlot = require("../../models/TimeSlot");
+const DoctorTimeSlot = require("../../models/TimeSlot");
 const Appointment = require("../../models/Appointment");
 const User = require("../../models/userModel");
-const createTimeSlots = async (req, res) => {
+const addOrUpdateTimeSlots = async (req, res) => {
   try {
-    const { date, slots } = req.body;
-    const doctor = req.user.id;
-
-    if (!doctor || !date || !Array.isArray(slots) || slots.length === 0) {
+    const doctorId = req.user.id;
+    const { slots } = req.body;
+    console.log(req.user);
+    // 1. Validate input (each slot must have valid startTime and endTime)
+    if (!Array.isArray(slots) || slots.length === 0) {
       return res
         .status(400)
-        .json({ message: "Doctor, date, and slots are required." });
+        .json({ message: "At least one slot is required." });
     }
-
-    // Convert date to start of day for comparison
-    const slotDate = new Date(date);
-    slotDate.setHours(0, 0, 0, 0);
-
-    // Fetch existing slots for doctor on that date
-    const existingSlots = await TimeSlot.find({
-      doctor,
-      date: {
-        $gte: slotDate,
-        $lt: new Date(slotDate.getTime() + 24 * 60 * 60 * 1000),
-      },
-    });
-
-    // Helper to check overlap
-    function isOverlapping(newSlot, existingSlot) {
-      return (
-        newSlot.startTime < existingSlot.endTime &&
-        newSlot.endTime > existingSlot.startTime
-      );
-    }
-
-    const results = [];
     for (const slot of slots) {
-      // Validation: startTime < endTime
-      const startTime = new Date(slot.startTime);
-      const endTime = new Date(slot.endTime);
-      if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime) {
-        results.push({
-          slot,
-          status: "invalid",
-          reason: "Invalid start or end time.",
-        });
-        continue;
-      }
-      // Validation: must be within the same date
       if (
-        startTime.toDateString() !== slotDate.toDateString() ||
-        endTime.toDateString() !== slotDate.toDateString()
+        !slot.startTime ||
+        !slot.endTime ||
+        !/^([01]\d|2[0-3]):([0-5]\d)$/.test(slot.startTime) ||
+        !/^([01]\d|2[0-3]):([0-5]\d)$/.test(slot.endTime)
       ) {
-        results.push({
-          slot,
-          status: "invalid",
-          reason: "Slot must be within provided date.",
+        return res.status(400).json({
+          message:
+            "Each slot must have valid startTime and endTime in HH:mm format.",
         });
-        continue;
-      }
-      // Overlap check
-      const overlap = existingSlots.some((existing) =>
-        isOverlapping({ startTime, endTime }, existing)
-      );
-      if (overlap) {
-        results.push({
-          slot,
-          status: "skipped",
-          reason: "Overlaps with existing slot.",
-        });
-        continue;
-      }
-      // Try to create the slot
-      try {
-        const newSlot = await TimeSlot.create({
-          doctor,
-          date: slotDate,
-          startTime,
-          endTime,
-        });
-        existingSlots.push(newSlot); // Add to in-memory list for further overlap checks
-        results.push({ slot, status: "created" });
-      } catch (err) {
-        // Handle possible unique constraint violation
-        results.push({ slot, status: "error", reason: err.message });
       }
     }
-    res.status(201).json({ message: "Slots processed.", results });
+
+    // 2. Upsert: If slots already exist for doctor, update; else, create new
+    const updated = await DoctorTimeSlot.findOneAndUpdate(
+      { doctor: doctorId },
+      { $set: { slots } },
+      { upsert: true, new: true }
+    );
+
+    return res.status(200).json({
+      message: "Time slots saved successfully.",
+      data: updated,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error." });
+    console.error("Error saving time slots:", error);
+    return res.status(500).json({
+      message: "An error occurred while saving time slots.",
+      error: error.message,
+    });
   }
 };
 
-const getDummyTimeSlots = async (req, res) => {
+function generateThirtyMinSlotsWithBreaks(start = "08:00", end = "20:00") {
+  const slots = [];
+  let [h, m] = start.split(":").map(Number);
+  const [endH, endM] = end.split(":").map(Number);
+
+  function timeToStr(h, m) {
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  }
+
+  while (h < endH || (h === endH && m <= endM)) {
+    const slotStart = timeToStr(h, m);
+
+    // Calculate slot end
+    let slotEndH = h,
+      slotEndM = m + 30;
+    if (slotEndM >= 60) {
+      slotEndH += 1;
+      slotEndM -= 60;
+    }
+    const slotEnd = timeToStr(slotEndH, slotEndM);
+
+    // If the slot ends after the working hours, stop
+    if (slotEndH > endH || (slotEndH === endH && slotEndM > endM)) {
+      break;
+    }
+
+    slots.push({ startTime: slotStart, endTime: slotEnd });
+
+    // Add 30-minute break
+    let breakH = slotEndH,
+      breakM = slotEndM + 30;
+    if (breakM >= 60) {
+      breakH += 1;
+      breakM -= 60;
+    }
+    h = breakH;
+    m = breakM;
+  }
+  return slots;
+}
+
+// Controller to get all possible 30-min slots with breaks
+const getThirtyMinSlotsWithBreaks = (req, res) => {
+  const { dayStart = "08:00", dayEnd = "20:00" } = req.query;
+  const slots = generateThirtyMinSlotsWithBreaks(dayStart, dayEnd);
+
+  res.status(200).json({
+    message: "Available 30-minute slots with 30-minute breaks",
+    slots,
+  });
+};
+
+const getAvailableSlots = async (req, res) => {
   try {
-    const { date } = req.query; // Expect ?date=YYYY-MM-DD
-    if (!date) {
-      return res
-        .status(400)
-        .json({ message: "Date is required in query params (YYYY-MM-DD)." });
-    }
+    const { date } = req.query;
 
-    // Parse and validate date
-    const baseDate = new Date(date);
-    if (isNaN(baseDate)) {
-      return res.status(400).json({ message: "Invalid date format." });
-    }
-
-    const startHour = 9;
-    const endHour = 21; // 9 PM (ending time)
-
-    const slotDuration = 60; // one hour in minutes
-    const slots = [];
-
-    for (let hour = startHour; hour < endHour; hour++) {
-      let slotStart = new Date(baseDate);
-      slotStart.setHours(hour, 0, 0, 0);
-
-      let slotEnd = new Date(slotStart);
-      slotEnd.setMinutes(slotEnd.getMinutes() + slotDuration);
-
-      // Only include slots that end by or before 9 PM
-      if (
-        slotEnd.getHours() > endHour ||
-        (slotEnd.getHours() === endHour && slotEnd.getMinutes() > 0)
-      ) {
-        continue;
-      }
-
-      slots.push({
-        startTime: slotStart.toISOString(),
-        endTime: slotEnd.toISOString(),
+    // Enhanced input validation
+    if (!date || !date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return res.status(400).json({
+        message: "Valid date is required in 'YYYY-MM-DD' format.",
       });
     }
 
-    res.status(200).json({
-      date,
-      slots,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error." });
-  }
-};
-
-// const getAvailableUniqueSlots = async (req, res) => {
-//   try {
-//     const { date } = req.query;
-//     if (!date) {
-//       return res
-//         .status(400)
-//         .json({ message: "Date is required in query params (YYYY-MM-DD)." });
-//     }
-
-//     // Parse the date for midnight to midnight
-//     const [year, month, day] = date.split("-").map(Number);
-//     if (!year || !month || !day) {
-//       return res.status(400).json({ message: "Invalid date format." });
-//     }
-//     const dayStart = new Date(year, month - 1, day, 0, 0, 0, 0);
-//     const nextDay = new Date(year, month - 1, day + 1, 0, 0, 0, 0);
-
-//     // Find all available slots for that date (status 'available', not booked)
-//     const slots = await TimeSlot.find({
-//       date: { $gte: dayStart, $lt: nextDay },
-//       status: "available",
-//       isBooked: false,
-//     }).populate("doctor", "name email"); // you can adjust fields as needed
-
-//     // Organize slots by unique interval
-//     const slotsMap = {};
-//     for (const slot of slots) {
-//       const key = `${slot.startTime.toISOString()}_${slot.endTime.toISOString()}`;
-//       if (!slotsMap[key]) {
-//         slotsMap[key] = {
-//           startTime: slot.startTime,
-//           endTime: slot.endTime,
-//           doctors: [],
-//         };
-//       }
-//       slotsMap[key].doctors.push({
-//         _id: slot.doctor._id,
-//         name: slot.doctor.name,
-//         email: slot.doctor.email,
-//         timeSlotId: slot._id, // Needed for booking
-//       });
-//     }
-
-//     // Format response
-//     const response = Object.values(slotsMap).sort(
-//       (a, b) => new Date(a.startTime) - new Date(b.startTime)
-//     );
-
-//     res.status(200).json({ date, slots: response });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: "Server error." });
-//   }
-// };
-
-const getAvailableUniqueSlots = async (req, res) => {
-  try {
-    const { date } = req.query;
-    if (!date) {
-      return res
-        .status(400)
-        .json({ message: "Date is required in query params (YYYY-MM-DD)." });
-    }
-
-    const [year, month, day] = date.split("-").map(Number);
-    if (!year || !month || !day) {
+    // Parse date once to validate it's a real date
+    const queryDate = new Date(date);
+    if (isNaN(queryDate.getTime())) {
       return res.status(400).json({ message: "Invalid date format." });
     }
 
-    const dayStart = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const nextDay = new Date(year, month - 1, day + 1, 0, 0, 0, 0);
+    // Run both database queries concurrently with Promise.all
+    // Use select() to fetch only needed fields and lean() for plain JS objects
+    const [doctorSlotsDocs, appointments] = await Promise.all([
+      DoctorTimeSlot.find({})
+        .select("doctor slots")
+        .populate("doctor", "fullname email")
+        .lean(),
 
-    const slots = await TimeSlot.find({
-      date: { $gte: dayStart, $lt: nextDay },
-      status: "available",
-      isBooked: false,
-    }).populate("doctor", "name email");
+      Appointment.find({
+        date: queryDate,
+        status: { $in: ["scheduled", "completed"] },
+      })
+        .select("doctor timeSlot")
+        .lean(),
+    ]);
 
-    const formattedSlots = slots
-      .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
-      .map((slot) => ({
-        timeSlotId: slot._id,
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        doctors: [
-          {
-            _id: slot.doctor._id,
-            name: slot.doctor.name,
-            email: slot.doctor.email,
-          },
-        ],
-      }));
+    // Create a Map of booked slots for O(1) lookup
+    const bookedSlotMap = new Map();
+    appointments.forEach((app) => {
+      const key = `${app.doctor.toString()}_${app.timeSlot.startTime}-${
+        app.timeSlot.endTime
+      }`;
+      bookedSlotMap.set(key, true);
+    });
 
-    res.status(200).json({ date, slots: formattedSlots });
+    // Process all slots and filter available doctors in a single pass
+    const slotMap = new Map();
+
+    doctorSlotsDocs.forEach((doc) => {
+      if (!doc.doctor) return; // Skip if doctor reference is missing
+
+      doc.slots.forEach((slot) => {
+        const slotKey = `${slot.startTime}-${slot.endTime}`;
+        const bookingKey = `${doc.doctor._id.toString()}_${slotKey}`;
+
+        // Skip already booked slots immediately (early exit)
+        if (bookedSlotMap.has(bookingKey)) return;
+
+        // Add doctor to available doctors for this slot
+        if (!slotMap.has(slotKey)) {
+          slotMap.set(slotKey, {
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            doctors: [],
+          });
+        }
+
+        slotMap.get(slotKey).doctors.push({
+          doctorId: doc.doctor._id,
+          name: doc.doctor.fullname,
+          email: doc.doctor.email,
+        });
+      });
+    });
+
+    // Convert Map to array for response
+    const availableSlots = Array.from(slotMap.values());
+
+    return res.status(200).json({
+      date,
+      availableSlots,
+      count: availableSlots.length,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error." });
+    console.error("Error fetching available slots:", error);
+    return res.status(500).json({
+      message: "An error occurred while fetching available slots.",
+      error:
+        process.env.NODE_ENV === "production" ? "Server error" : error.message,
+    });
   }
 };
+
+function isValidTimeSlot(slot) {
+  const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  return (
+    slot &&
+    typeof slot.startTime === "string" &&
+    typeof slot.endTime === "string" &&
+    timeRegex.test(slot.startTime) &&
+    timeRegex.test(slot.endTime)
+  );
+}
 
 const bookAppointment = async (req, res) => {
   try {
-    const { timeSlot, doctor, notes } = req.body;
-    const patient = req.user.id;
+    const { date, timeSlot, doctor } = req.body;
+    const patient = req.user.id; // From auth middleware
+
     // Validate input
-    if (!timeSlot || !doctor || !patient) {
-      return res
-        .status(400)
-        .json({ message: "Time slot, doctor, and patient are required." });
+    if (!date || !timeSlot || !doctor || !isValidTimeSlot(timeSlot)) {
+      return res.status(400).json({
+        message:
+          "date, timeSlot (with valid startTime and endTime), and doctor are required.",
+      });
     }
 
-    // Check if the time slot exists and is available
-    const slot = await TimeSlot.findById(timeSlot);
-    if (!slot) {
-      return res.status(404).json({ message: "Time slot not found." });
-    }
-    if (slot.isBooked) {
-      return res.status(400).json({ message: "Time slot is already booked." });
-    }
-
-    // Check if the doctor and patient exist
-    const doctorExists = await User.findById(doctor);
-    const patientExists = await User.findById(patient);
-    if (!doctorExists) {
+    // Check if doctor exists and is a doctor
+    const doctorUser = await User.findOne({ _id: doctor, role: "doctor" });
+    if (!doctorUser) {
       return res.status(404).json({ message: "Doctor not found." });
     }
-    if (!patientExists) {
-      return res.status(404).json({ message: "Patient not found." });
+
+    // Optional: Check if this slot is among the doctor's available slots
+    const doctorSlots = await DoctorTimeSlot.findOne({ doctor });
+    const slotExists =
+      doctorSlots &&
+      doctorSlots.slots.some(
+        (slot) =>
+          slot.startTime === timeSlot.startTime &&
+          slot.endTime === timeSlot.endTime
+      );
+    if (!slotExists) {
+      return res
+        .status(400)
+        .json({ message: "Selected slot is not available for this doctor." });
     }
 
-    // Create the appointment
-    const appointment = new Appointment({
+    // Check if the slot is already booked for this doctor on this date
+    const existingAppointment = await Appointment.findOne({
+      date: new Date(date),
+      doctor,
+      "timeSlot.startTime": timeSlot.startTime,
+      "timeSlot.endTime": timeSlot.endTime,
+      status: { $in: ["scheduled", "completed"] },
+    });
+    if (existingAppointment) {
+      return res.status(409).json({
+        message: "This time slot is already booked for the selected date.",
+      });
+    }
+
+    // Book the appointment
+    const appointment = await Appointment.create({
+      date: new Date(date),
       timeSlot,
       doctor,
       patient,
-      meetLink: doctorExists.meetLink || null, // Assuming doctor's meet link is stored in their profile
-      notes: notes || null,
-      status: "scheduled", // Default status
-      followUpRequired: false, // Default value; can be modified later by the doctor
+      status: "scheduled",
     });
 
-    // Save the appointment
-    await appointment.save();
-
-    // Update the time slot to mark it as booked
-    slot.isBooked = true; // Mark the slot as booked
-    slot.status = "booked"; // Update status if necessary
-    await slot.save();
-
-    res
-      .status(201)
-      .json({ message: "Appointment booked successfully.", appointment });
+    return res.status(201).json({
+      message: "Appointment booked successfully.",
+      appointment,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error." });
+    console.error("Error booking appointment:", error);
+    return res.status(500).json({
+      message: "An error occurred while booking the appointment.",
+      error: error.message,
+    });
+  }
+};
+
+const getDoctorsForSlot = async (req, res) => {
+  try {
+    const { date, startTime, endTime } = req.query;
+
+    // Basic validation
+    if (
+      !date ||
+      !startTime ||
+      !endTime ||
+      !/^([01]\d|2[0-3]):([0-5]\d)$/.test(startTime) ||
+      !/^([01]\d|2[0-3]):([0-5]\d)$/.test(endTime)
+    ) {
+      return res.status(400).json({
+        message:
+          "Please provide date (YYYY-MM-DD), startTime and endTime (HH:mm format).",
+      });
+    }
+
+    const dateObj = new Date(date);
+
+    // Step 1: Find all doctors who have this slot published
+    const doctorsWithSlot = await DoctorTimeSlot.find({
+      slots: { $elemMatch: { startTime, endTime } },
+    }).populate("doctor", "fullname email");
+
+    if (!doctorsWithSlot.length) {
+      return res.status(200).json({ availableDoctors: [] });
+    }
+
+    // Step 2: Find all doctors already booked for this slot on this date
+    const bookedAppointments = await Appointment.find({
+      date: dateObj,
+      "timeSlot.startTime": startTime,
+      "timeSlot.endTime": endTime,
+      status: { $in: ["scheduled", "completed"] },
+    });
+
+    const bookedDoctorIds = bookedAppointments.map((app) =>
+      app.doctor.toString()
+    );
+
+    // Step 3: Exclude booked doctors
+    const availableDoctors = doctorsWithSlot
+      .filter(
+        (docSlot) => !bookedDoctorIds.includes(docSlot.doctor._id.toString())
+      )
+      .map((docSlot) => ({
+        doctorId: docSlot.doctor._id,
+        name: docSlot.doctor.fullname,
+        email: docSlot.doctor.email,
+      }));
+
+    return res.status(200).json({ availableDoctors });
+  } catch (error) {
+    console.error("Error fetching available doctors:", error);
+    return res.status(500).json({
+      message: "An error occurred while fetching available doctors.",
+      error: error.message,
+    });
   }
 };
 module.exports = {
-  createTimeSlots,
-  getDummyTimeSlots,
-  getAvailableUniqueSlots,
+  addOrUpdateTimeSlots,
+  getThirtyMinSlotsWithBreaks,
+  getAvailableSlots,
   bookAppointment,
+  getDoctorsForSlot,
 };

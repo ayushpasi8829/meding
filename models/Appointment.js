@@ -1,10 +1,21 @@
 const mongoose = require("mongoose");
 
 const appointmentSchema = new mongoose.Schema({
-  timeSlot: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "TimeSlot",
+  date: {
+    type: Date,
     required: true,
+  },
+  timeSlot: {
+    startTime: {
+      type: String,
+      required: true,
+      match: /^([01]\d|2[0-3]):([0-5]\d)$/,
+    },
+    endTime: {
+      type: String,
+      required: true,
+      match: /^([01]\d|2[0-3]):([0-5]\d)$/,
+    },
   },
   doctor: {
     type: mongoose.Schema.Types.ObjectId,
@@ -29,10 +40,7 @@ const appointmentSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
-  followUpRequired: {
-    type: Boolean,
-    default: false,
-  },
+
   createdAt: {
     type: Date,
     default: Date.now,
