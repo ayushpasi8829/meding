@@ -2,50 +2,43 @@ const User = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-exports.signup = async (req, res) => {
-  const { fullname, email, mobile, countryCode, location, reason } = req.body;
+exports.sendOtp = async (req, res) => {
+  const { mobile, countryCode } = req.body;
 
-  if (!fullname || !email || !mobile || !countryCode || !location || !reason) {
-    return res
-      .status(400)
-      .json({ success: false, message: "All fields are required" });
+  if (!mobile || !countryCode) {
+    return res.status(400).json({ success: false, message: "Mobile and country code are required" });
   }
-  // const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
+  const otp = Math.floor(100000 + Math.random() * 900000).toString(); // generate random OTP
   const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
-  const otp = 123456; // For testing purposes, use a fixed OTP
+
   try {
-    let user = await User.findOne({ email });
-    if (user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User already exists" });
+    let user = await User.findOne({ mobile });
+
+    if (!user) {
+      user = new User({
+        mobile,
+        countryCode,
+        role: "user",
+        otp,
+        otpExpiresAt,
+      });
+    } else {
+      user.otp = otp;
+      user.otpExpiresAt = otpExpiresAt;
     }
 
-    user = new User({
-      fullname,
-      email,
-      mobile,
-      countryCode,
-      location,
-      reason,
-      otp,
-      otpExpiresAt,
-      role: "user",
-    });
     await user.save();
 
-    //await sendOtpToMobile(countryCode + mobile, otp);
+    // Send OTP via SMS here (e.g., using Twilio or any other service)
+    // await sendOtpToMobile(countryCode + mobile, otp);
 
-    res.status(201).json({
+    res.status(200).json({
       success: true,
-      message: "User registered successfully",
+      message: "OTP sent successfully",
       data: {
-        id: user._id,
-        fullname: user.fullname,
-        email: user.email,
-        role: user.role,
-        otp: user.otp,
+        mobile: user.mobile,
+        otp, // Only for testing – remove in production!
       },
     });
   } catch (err) {
@@ -53,28 +46,23 @@ exports.signup = async (req, res) => {
   }
 };
 
-exports.otpVerify = async (req, res) => {
+exports.verifyOtp = async (req, res) => {
   const { mobile, otp } = req.body;
 
   if (!mobile || !otp) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Mobile and OTP are required" });
+    return res.status(400).json({ success: false, message: "Mobile and OTP are required" });
   }
 
   try {
     const user = await User.findOne({ mobile });
 
-    // if (!user || user.otp !== otp) {
-    //   return res
-    //     .status(400)
-    //     .json({ success: false, message: "Invalid or expired OTP" });
-    // }
+    if (!user || user.otp !== otp || user.otpExpiresAt < new Date()) {
+      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+    }
 
     user.isMobileVerified = true;
     user.otp = undefined;
     user.otpExpiresAt = undefined;
-
     await user.save();
 
     const token = jwt.sign({ id: user._id, role: user.role }, "SECRET_KEY");
@@ -84,17 +72,56 @@ exports.otpVerify = async (req, res) => {
       message: "OTP verified successfully",
       data: {
         id: user._id,
-        fullname: user.fullname,
-        email: user.email,
         mobile: user.mobile,
         token,
       },
     });
   } catch (err) {
-    console.error("OTP verification error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// Middleware required: verifyToken (JWT validation)
+
+exports.completeRegistration = async (req, res) => {
+  const { fullname, email, location, reason } = req.body;
+  const userId = req.user.id; // extracted from JWT via middleware
+
+  if (!fullname || !email || !location || !reason) {
+    return res.status(400).json({ success: false, message: "All fields are required" });
+  }
+
+  try {
+    let user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    user.fullname = fullname;
+    user.email = email;
+    user.location = location;
+    user.reason = reason;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "User information updated successfully",
+      data: {
+        id: user._id,
+        fullname: user.fullname,
+        email: user.email,
+        mobile: user.mobile,
+        location: user.location,
+        reason: user.reason,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 
 exports.doctorSignup = async (req, res) => {
   console.log("droctor signup called", req.body);

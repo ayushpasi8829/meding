@@ -26,8 +26,7 @@ router.post(
   "/book-appointment",
   verifyToken,
   isUser,
-  appointmentController.bookAppointment
+  appointmentController.autoBookAppointment
 );
 
-router.get("/get-doctors", appointmentController.getDoctorsForSlot);
 module.exports = router;

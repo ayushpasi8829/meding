@@ -199,81 +199,12 @@ function isValidTimeSlot(slot) {
   );
 }
 
-const bookAppointment = async (req, res) => {
+const autoBookAppointment = async (req, res) => {
   try {
-    const { date, timeSlot, doctor } = req.body;
+    const { date, startTime, endTime } = req.body;
     const patient = req.user.id; // From auth middleware
 
     // Validate input
-    if (!date || !timeSlot || !doctor || !isValidTimeSlot(timeSlot)) {
-      return res.status(400).json({
-        message:
-          "date, timeSlot (with valid startTime and endTime), and doctor are required.",
-      });
-    }
-
-    // Check if doctor exists and is a doctor
-    const doctorUser = await User.findOne({ _id: doctor, role: "doctor" });
-    if (!doctorUser) {
-      return res.status(404).json({ message: "Doctor not found." });
-    }
-
-    // Optional: Check if this slot is among the doctor's available slots
-    const doctorSlots = await DoctorTimeSlot.findOne({ doctor });
-    const slotExists =
-      doctorSlots &&
-      doctorSlots.slots.some(
-        (slot) =>
-          slot.startTime === timeSlot.startTime &&
-          slot.endTime === timeSlot.endTime
-      );
-    if (!slotExists) {
-      return res
-        .status(400)
-        .json({ message: "Selected slot is not available for this doctor." });
-    }
-
-    // Check if the slot is already booked for this doctor on this date
-    const existingAppointment = await Appointment.findOne({
-      date: new Date(date),
-      doctor,
-      "timeSlot.startTime": timeSlot.startTime,
-      "timeSlot.endTime": timeSlot.endTime,
-      status: { $in: ["scheduled", "completed"] },
-    });
-    if (existingAppointment) {
-      return res.status(409).json({
-        message: "This time slot is already booked for the selected date.",
-      });
-    }
-
-    // Book the appointment
-    const appointment = await Appointment.create({
-      date: new Date(date),
-      timeSlot,
-      doctor,
-      patient,
-      status: "scheduled",
-    });
-
-    return res.status(201).json({
-      message: "Appointment booked successfully.",
-      appointment,
-    });
-  } catch (error) {
-    console.error("Error booking appointment:", error);
-    return res.status(500).json({
-      message: "An error occurred while booking the appointment.",
-      error: error.message,
-    });
-  }
-};
-
-const getDoctorsForSlot = async (req, res) => {
-  try {
-    const { date, startTime, endTime } = req.query;
-
-    // Basic validation
     if (
       !date ||
       !startTime ||
@@ -283,22 +214,24 @@ const getDoctorsForSlot = async (req, res) => {
     ) {
       return res.status(400).json({
         message:
-          "Please provide date (YYYY-MM-DD), startTime and endTime (HH:mm format).",
+          "Please provide date (YYYY-MM-DD), startTime and endTime in HH:mm format.",
       });
     }
 
     const dateObj = new Date(date);
 
-    // Step 1: Find all doctors who have this slot published
+    // Step 1: Find all doctors who have this slot available
     const doctorsWithSlot = await DoctorTimeSlot.find({
       slots: { $elemMatch: { startTime, endTime } },
     }).populate("doctor", "fullname email");
 
     if (!doctorsWithSlot.length) {
-      return res.status(200).json({ availableDoctors: [] });
+      return res
+        .status(404)
+        .json({ message: "No doctors available for the given time slot." });
     }
 
-    // Step 2: Find all doctors already booked for this slot on this date
+    // Step 2: Find doctors already booked for this slot on this date
     const bookedAppointments = await Appointment.find({
       date: dateObj,
       "timeSlot.startTime": startTime,
@@ -306,34 +239,56 @@ const getDoctorsForSlot = async (req, res) => {
       status: { $in: ["scheduled", "completed"] },
     });
 
-    const bookedDoctorIds = bookedAppointments.map((app) =>
-      app.doctor.toString()
+    const bookedDoctorIds = bookedAppointments.map((a) => a.doctor.toString());
+
+    // Step 3: Filter out booked doctors
+    const availableDoctors = doctorsWithSlot.filter(
+      (docSlot) => !bookedDoctorIds.includes(docSlot.doctor._id.toString())
     );
 
-    // Step 3: Exclude booked doctors
-    const availableDoctors = doctorsWithSlot
-      .filter(
-        (docSlot) => !bookedDoctorIds.includes(docSlot.doctor._id.toString())
-      )
-      .map((docSlot) => ({
-        doctorId: docSlot.doctor._id,
-        name: docSlot.doctor.fullname,
-        email: docSlot.doctor.email,
-      }));
+    if (!availableDoctors.length) {
+      return res
+        .status(409)
+        .json({ message: "All doctors are booked for this time slot." });
+    }
 
-    return res.status(200).json({ availableDoctors });
+    // Step 4: Pick a doctor (random or custom logic)
+    const selectedDoctor = availableDoctors[Math.floor(Math.random() * availableDoctors.length)];
+
+    // Step 5: Book the appointment
+    const appointment = await Appointment.create({
+      date: dateObj,
+      timeSlot: { startTime, endTime },
+      doctor: selectedDoctor.doctor._id,
+      patient,
+      status: "scheduled",
+    });
+
+    return res.status(201).json({
+      message: "Appointment booked successfully.",
+      appointment: {
+        id: appointment._id,
+        date: appointment.date,
+        timeSlot: appointment.timeSlot,
+        doctor: {
+          id: selectedDoctor.doctor._id,
+          name: selectedDoctor.doctor.fullname,
+          email: selectedDoctor.doctor.email,
+        },
+      },
+    });
   } catch (error) {
-    console.error("Error fetching available doctors:", error);
+    console.error("Error auto booking appointment:", error);
     return res.status(500).json({
-      message: "An error occurred while fetching available doctors.",
+      message: "An error occurred while booking the appointment.",
       error: error.message,
     });
   }
 };
+
 module.exports = {
   addOrUpdateTimeSlots,
   getThirtyMinSlotsWithBreaks,
   getAvailableSlots,
-  bookAppointment,
-  getDoctorsForSlot,
+  autoBookAppointment,
 };

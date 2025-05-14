@@ -6,5 +6,6 @@ const router = express.Router();
 
 router.get("/session-request/get", verifyToken, isDoctor, doctorController.getDoctorSessionRequests);
 router.post("/session/accept", verifyToken, isDoctor,doctorController.acceptSessionRequest);
+router.post("/session/cancel", verifyToken, isDoctor,doctorController.cancelAppointment);
 
 module.exports = router;

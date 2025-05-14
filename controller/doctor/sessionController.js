@@ -1,13 +1,13 @@
 const User = require("../../models/userModel");
-const SessionRequest = require("../../models/SessionRequest");
+const Appointment = require("../../models/Appointment");
 const sendMessage = require("../../utils/sendMessage");
 
 exports.getDoctorSessionRequests = async (req, res) => {
     const doctorId = req.user?.id;
   
     try {
-      const sessions = await SessionRequest.find({ doctor: doctorId })
-        .populate("user", "fullname email mobile") // Show user info
+      const sessions = await Appointment.find({ doctor: doctorId })
+        .populate("patient", "fullname email mobile")
         .sort({ createdAt: -1 });
   
       res.status(200).json({
@@ -24,9 +24,9 @@ exports.getDoctorSessionRequests = async (req, res) => {
 
   exports.acceptSessionRequest = async (req, res) => {
     const doctorId = req.user?.id;
-    const { sessionId, meetingLink, startTime, endTime } = req.body;
+    const { sessionId, meetingLink} = req.body;
   
-    if (!sessionId || !meetingLink || !startTime || !endTime) {
+    if (!sessionId || !meetingLink ) {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
@@ -34,7 +34,7 @@ exports.getDoctorSessionRequests = async (req, res) => {
     }
   
     try {
-      const session = await SessionRequest.findById(sessionId);
+      const session = await Appointment.findById(sessionId);
       if (!session) {
         return res.status(404).json({ success: false, message: "Session not found" });
       }
@@ -44,14 +44,12 @@ exports.getDoctorSessionRequests = async (req, res) => {
       }
   
       // Update session
-      session.meetingLink = meetingLink;
-      session.startTime = new Date(startTime);
-      session.endTime = new Date(endTime);
-      session.doctorAccept = true;
-      await session.save();
+      session.meetLink = meetingLink;
+      session.status = 'scheduled';
+      await Appointment.save();
   
       // Get user details for notification
-      const user = await User.findById(session.user);
+      const user = await User.findById(session.patient);
       if (!user) {
         return res.status(404).json({ success: false, message: "User not found" });
       }
@@ -73,3 +71,57 @@ exports.getDoctorSessionRequests = async (req, res) => {
     }
   };
   
+exports.cancelAppointment = async (req, res) => {
+  const doctorId = req.user?.id;
+  const { sessionId } = req.body;
+
+  if (!sessionId) {
+    return res.status(400).json({
+      success: false,
+      message: "sessionId is required",
+    });
+  }
+
+  try {
+    const session = await Appointment.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    // Ensure only the assigned doctor can cancel
+    if (session.doctor.toString() !== doctorId) {
+      return res.status(403).json({ success: false, message: "Only the assigned doctor can cancel this appointment" });
+    }
+
+    // Prevent cancelling completed sessions
+    if (session.status === "completed") {
+      return res.status(400).json({ success: false, message: "Cannot cancel a completed session" });
+    }
+
+    // Mark appointment as cancelled
+    session.status = "cancelled";
+    await session.save();
+
+    // Notify patient (optional)
+    const patient = await User.findById(session.patient);
+    if (patient) {
+      const fullPhone = `${patient.countryCode}${patient.mobile}`;
+      const message = `Hi ${patient.fullname}, your session scheduled on ${new Date(
+        session.date
+      ).toLocaleDateString()} at ${session.timeSlot.startTime} has been cancelled by the doctor.`;
+      await sendMessage(fullPhone, message, patient.email);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Appointment cancelled successfully by doctor",
+      data: session,
+    });
+  } catch (error) {
+    console.error("Doctor cancel appointment error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};
