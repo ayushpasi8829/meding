@@ -14,6 +14,15 @@ router.post("/therapy-flow", verifyToken, isUser, userController.therapyFlow );
 router.post("/therapy-general-question", verifyToken, isUser, userController.therapyGeneralQuestions );
 router.post("/therapy/step3", verifyToken, isUser, userController.updateStep3TherapyDetails );
 
+//Psychometrics
+router.post("/Psychometrics/store", verifyToken, isUser, userController.savePsychometricStep1 );
+
+//CorporateWellness 
+router.post("/corporateWellness", verifyToken, isUser, userController.submitCorporateWellness );
+
+//Internship
+router.post("/internship", verifyToken, isUser, userController.submitInternshipForm );
+
 router.get(
   "/session/request",
   verifyToken,
