@@ -4,7 +4,8 @@ const questionSchema = new mongoose.Schema({
   question: { type: String, required: true },
   options: {
     type: [String],
-    default: ["Yes", "No", "Maybe"],
+    enum: ["Almost Always", "Often", "Sometimes", "Rarely"],
+    default: ["Almost Always", "Often", "Sometimes", "Rarely"],
   },
 });
 
