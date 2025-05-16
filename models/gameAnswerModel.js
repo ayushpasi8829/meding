@@ -9,7 +9,7 @@ const userAnswerSchema = new mongoose.Schema({
   },
   answer: {
     type: String,
-    enum: ["Yes", "No", "Maybe"],
+    enum: ["Almost Always", "Often", "Sometimes", "Rarely"],
     required: true,
   },
 });
