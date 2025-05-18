@@ -8,4 +8,7 @@ router.get("/session-request/get", verifyToken, isDoctor, doctorController.getDo
 router.post("/session/accept", verifyToken, isDoctor,doctorController.acceptSessionRequest);
 router.post("/session/cancel", verifyToken, isDoctor,doctorController.cancelAppointment);
 
+
+router.post("/session/notes", verifyToken, isDoctor,doctorController.addNotesToAppointment);
+
 module.exports = router;

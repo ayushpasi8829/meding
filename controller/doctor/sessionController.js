@@ -125,3 +125,54 @@ exports.cancelAppointment = async (req, res) => {
     });
   }
 };
+
+exports.addNotesToAppointment = async (req, res) => {
+  const doctorId = req.user?.id;
+  const { sessionId, notes } = req.body;
+
+  if (!sessionId || !notes?.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Both sessionId and notes are required",
+    });
+  }
+
+  try {
+    const session = await Appointment.findById(sessionId);
+    if (!session) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Appointment not found" });
+    }
+
+    // Ensure only assigned doctor can add notes
+    if (session.doctor.toString() !== doctorId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the assigned doctor can add notes",
+      });
+    }
+
+    if (session.status !== "completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Notes can only be added to completed sessions",
+      });
+    }
+
+    session.notes = notes.trim();
+    await session.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Notes added successfully",
+      data: session,
+    });
+  } catch (error) {
+    console.error("Add notes error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};

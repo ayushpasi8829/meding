@@ -27,6 +27,11 @@ const appointmentSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  bundleId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "BundleSession",
+    default: null
+  },
   meetLink: {
     type: String,
     default: null,
@@ -40,7 +45,11 @@ const appointmentSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
-
+  bundleId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "BundleSession",
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

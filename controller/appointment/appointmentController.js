@@ -1,6 +1,8 @@
 const DoctorTimeSlot = require("../../models/TimeSlot");
 const Appointment = require("../../models/Appointment");
 const User = require("../../models/userModel");
+const sendMessage = require("../../utils/sendMessage");
+
 const addOrUpdateTimeSlots = async (req, res) => {
   try {
     const doctorId = req.user.id;
@@ -201,10 +203,10 @@ function isValidTimeSlot(slot) {
 
 const autoBookAppointment = async (req, res) => {
   try {
-    const { date, startTime, endTime } = req.body;
-    const patient = req.user.id; // From auth middleware
+    const { date, startTime, endTime, bundleId } = req.body;
+    const patientId = req.user.id;
 
-    // Validate input
+    // Validate time input
     if (
       !date ||
       !startTime ||
@@ -220,7 +222,7 @@ const autoBookAppointment = async (req, res) => {
 
     const dateObj = new Date(date);
 
-    // Step 1: Find all doctors who have this slot available
+    // Step 1: Find doctors with this slot
     const doctorsWithSlot = await DoctorTimeSlot.find({
       slots: { $elemMatch: { startTime, endTime } },
     }).populate("doctor", "fullname email");
@@ -231,17 +233,20 @@ const autoBookAppointment = async (req, res) => {
         .json({ message: "No doctors available for the given time slot." });
     }
 
-    // Step 2: Find doctors already booked for this slot on this date
+    // Step 2: Find already booked doctors
     const bookedAppointments = await Appointment.find({
       date: dateObj,
       "timeSlot.startTime": startTime,
       "timeSlot.endTime": endTime,
+      bundleId,
       status: { $in: ["scheduled", "completed"] },
     });
 
-    const bookedDoctorIds = bookedAppointments.map((a) => a.doctor.toString());
+    const bookedDoctorIds = bookedAppointments.map((a) =>
+      a.doctor.toString()
+    );
 
-    // Step 3: Filter out booked doctors
+    // Step 3: Filter available doctors
     const availableDoctors = doctorsWithSlot.filter(
       (docSlot) => !bookedDoctorIds.includes(docSlot.doctor._id.toString())
     );
@@ -252,17 +257,26 @@ const autoBookAppointment = async (req, res) => {
         .json({ message: "All doctors are booked for this time slot." });
     }
 
-    // Step 4: Pick a doctor (random or custom logic)
-    const selectedDoctor = availableDoctors[Math.floor(Math.random() * availableDoctors.length)];
+    // Step 4: Pick a doctor
+    const selectedDoctor =
+      availableDoctors[Math.floor(Math.random() * availableDoctors.length)];
 
-    // Step 5: Book the appointment
+    // Step 5: Book appointment
     const appointment = await Appointment.create({
       date: dateObj,
       timeSlot: { startTime, endTime },
       doctor: selectedDoctor.doctor._id,
-      patient,
+      patient: patientId,
       status: "scheduled",
     });
+
+    // Step 6: Send Notification
+    const patient = await User.findById(patientId); // Assuming you store patients in the User model
+    const fullPhone = `+${String(patient.countryCode).replace(/\D/g, "")}${String(patient.mobile).replace(/\D/g, "")}`;
+
+    const notificationMessage = `Hello ${patient.fullname}, your session with Dr. ${selectedDoctor.doctor.fullname} on ${date} from ${startTime} to ${endTime} has been scheduled successfully.`;
+
+    await sendMessage(fullPhone, notificationMessage, patient.email);
 
     return res.status(201).json({
       message: "Appointment booked successfully.",
@@ -285,6 +299,8 @@ const autoBookAppointment = async (req, res) => {
     });
   }
 };
+
+
 
 module.exports = {
   addOrUpdateTimeSlots,

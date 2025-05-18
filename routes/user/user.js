@@ -38,4 +38,15 @@ router.get("/get-selectedplan", verifyToken, isUser, planController.getSelectedP
 
 router.get(
   "/get-plans", planController.getAllPlans);
+
+
+//client panel 
+router.get("/session-summary", verifyToken, isUser, userController.getSessionSummary );
+router.get("/today-session", verifyToken, isUser, userController.getTodaySession );
+router.get("/upcoming-session", verifyToken, isUser, userController.getUpcomingSession );
+
+router.get("/therapy-plan", verifyToken, isUser, userController.getTherapyPlan );
+
+router.get("/therapy-notes", verifyToken, isUser, userController.getTherapyNotes );
+
 module.exports = router;

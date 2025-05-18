@@ -38,6 +38,10 @@ const userSchema = new mongoose.Schema({
     ref: "Therapy",
     default: null,
   },
+  hasSelectedBundle: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 module.exports = mongoose.model("User", userSchema);

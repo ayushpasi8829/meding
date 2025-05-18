@@ -15,7 +15,7 @@ exports.submitAnswer = async (req, res) => {
       .json({ success: false, message: "Question ID and answer are required" });
   }
 
-  if (!["Almost Always", "Often", "Sometimes", "Rarely"].includes(answer)) {
+  if (!["Yes", "No", "Maybe"].includes(answer)) {
     return res
       .status(400)
       .json({ success: false, message: "Invalid answer selected" });

@@ -4,6 +4,9 @@ const CorporateWellness = require("../../models/CorporateWellness");
 const Internship = require("../../models/Internship");
 const PsychometricAssessment = require("../../models/PsychometricAssessment");
 const SessionRequest = require("../../models/SessionRequest");
+const Appointment = require("../../models/Appointment");
+const BundleSession = require("../../models/BundleSession");
+const moment = require("moment");
 
 const getRelationshipManagerAvailability = () => {
   return [
@@ -382,5 +385,158 @@ exports.createSessionRequest = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+exports.getSessionSummary = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const now = new Date();
+    console.log(userId)
+    const allAppointments = await Appointment.find({ patient: userId });
+    console.log(allAppointments);
+    const upcoming = allAppointments.filter(app => app.date > now &&  app.status === "scheduled");
+    const completed = allAppointments.filter(app => app.status === "completed");
+    const cancelled = allAppointments.filter(app =>
+      ["cancelled", "no-show"].includes(app.status)
+    );
+
+    return res.json({
+      totalSessions: allAppointments.length,
+      upcomingSessions: upcoming.length,
+      completedSessions: completed.length,
+      cancelledOrNoShow: cancelled.length,
+    });
+  } catch (err) {
+    console.error("Error getting session summary:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+exports.getTodaySession = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const todayStart = moment().startOf("day").toDate();
+    const todayEnd = moment().endOf("day").toDate();
+
+    const todaySession = await Appointment.findOne({
+      patient: userId,
+      date: { $gte: todayStart, $lte: todayEnd },
+      status: "scheduled"
+    }).populate("doctor", "name email");
+
+    if (!todaySession) {
+      return res.json({ hasSessionToday: false, message: "No session scheduled for today" });
+    }
+
+    return res.json({
+      hasSessionToday: true,
+      session: {
+        date: todaySession.date,
+        timeSlot: todaySession.timeSlot,
+        doctor: todaySession.doctor,
+      }
+    });
+  } catch (err) {
+    console.error("Error checking today's session:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+exports.getUpcomingSession = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const now = new Date();
+
+    const upcomingSession = await Appointment.findOne({
+      patient: userId,
+      date: { $gt: now },
+      status: "scheduled"
+    })
+    .sort({ date: 1 })
+    .populate("doctor", "name email");
+
+    if (!upcomingSession) {
+      return res.json({ hasUpcomingSession: false, message: "No upcoming sessions" });
+    }
+
+    return res.json({
+      hasUpcomingSession: true,
+      session: {
+        date: upcomingSession.date,
+        timeSlot: upcomingSession.timeSlot,
+        doctor: upcomingSession.doctor,
+      }
+    });
+  } catch (err) {
+    console.error("Error checking upcoming session:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+exports.getTherapyPlan = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const bundle = await BundleSession.findOne({ user: userId, isActive: true });
+
+    if (!bundle) {
+      return res.json({ hasActivePlan: false, message: "No active therapy bundle found." });
+    }
+
+    const { bundleType, totalSessions, usedSessions, paymentPlan } = bundle;
+    const { totalAmount, paidAmount, installments } = paymentPlan;
+
+    const dueAmount = totalAmount - paidAmount;
+
+    // Find next unpaid installment (if any)
+    const nextInstallment = installments.find(inst => inst.status === "pending");
+
+    return res.json({
+      hasActivePlan: true,
+      bundleId: bundle._id,
+      bundleType,
+      totalSessions,
+      usedSessions,
+      remainingSessions: totalSessions - usedSessions,
+      totalAmount,
+      paidAmount,
+      dueAmount,
+      installments,
+      nextPayment: nextInstallment
+        ? {
+            amount: nextInstallment.amount,
+            dueAfterSession: nextInstallment.dueSessionNumber,
+          }
+        : null,
+    });
+  } catch (error) {
+    console.error("Error fetching therapy plan:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+exports.getTherapyNotes = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const appointments = await Appointment.find({
+      patient: userId,
+      notes: { $exists: true, $ne: "" }
+     
+    })
+      .populate("doctor", "fullname") 
+      .sort({ date: -1 }); 
+
+    const notes = appointments.map(appointment => ({
+      date: appointment.date,
+      doctorName: appointment.doctor?.fullname || "Unknown",
+      therapyNotes: appointment.notes
+    }));
+
+    return res.json({ notes });
+  } catch (error) {
+    console.error("Error fetching therapy notes:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
