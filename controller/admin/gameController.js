@@ -38,7 +38,10 @@ exports.submitAnswer = async (req, res) => {
       .json({ success: false, message: "Question ID and answer are required" });
   }
 
-  if (!["Almost Always", "Often", "Sometimes", "Rarely"].includes(answer)) {
+  const allowedAnswers = ["Almost Always", "Often", "Sometimes", "Rarely"];
+  const sanitizedAnswer = answer.trim();
+
+  if (!allowedAnswers.includes(sanitizedAnswer)) {
     return res
       .status(400)
       .json({ success: false, message: "Invalid answer selected" });
@@ -58,8 +61,7 @@ exports.submitAnswer = async (req, res) => {
     });
 
     if (existingAnswer) {
-      // Update existing answer
-      existingAnswer.answer = answer;
+      existingAnswer.answer = sanitizedAnswer;
       await existingAnswer.save();
       return res.status(200).json({
         success: true,
@@ -71,7 +73,7 @@ exports.submitAnswer = async (req, res) => {
     const newAnswer = new UserAnswer({
       user: userId,
       question: questionId,
-      answer,
+      answer: sanitizedAnswer,
     });
 
     await newAnswer.save();
