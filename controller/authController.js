@@ -6,12 +6,10 @@ exports.sendOtp = async (req, res) => {
   const { mobile, countryCode } = req.body;
 
   if (!mobile || !countryCode) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Mobile and country code are required",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "Mobile and country code are required",
+    });
   }
 
   // const otp = Math.floor(100000 + Math.random() * 900000).toString(); // generate random OTP
@@ -84,6 +82,7 @@ exports.verifyOtp = async (req, res) => {
         id: user._id,
         mobile: user.mobile,
         token,
+        isMobileVerified: user.isMobileVerified,
       },
     });
   } catch (err) {
