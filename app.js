@@ -47,6 +47,10 @@ const appointment = require("./routes/appointmentRoute");
 app.use("/api/user", user);
 app.use("/api/game", gameanswer);
 app.use("/api/appointment", appointment);
+
+//community initiative route
+const communityInitiative = require("./routes/communityInitiative");
+app.use("/api/community", communityInitiative);
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
