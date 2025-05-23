@@ -30,4 +30,34 @@ router.post(
   communityInitiativeController.createOrgCampRequest
 );
 
+router.get(
+  "/get-sessions",
+  verifyToken,
+  communityInitiativeController.getActiveSession
+);
+
+// (Optional, admin) Create a new session
+router.post(
+  "/create-sessions",
+  verifyToken,
+  communityInitiativeController.createSession
+);
+
+router.post(
+  "/registrations",
+  verifyToken,
+  communityInitiativeController.register
+);
+
+router.post(
+  "/submit-proposal",
+  verifyToken,
+  communityInitiativeController.submitProposal
+);
+
+router.get(
+  "/get-activesessions",
+  verifyToken,
+  communityInitiativeController.getActiveSession
+);
 module.exports = router;

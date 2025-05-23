@@ -4,6 +4,9 @@ const {
   TherapyPlusHost,
 } = require("../../models/TherapyPlus");
 const OrgCampRequest = require("../../models/OrgCampRequest");
+const Session = require("../../models/Session");
+const Registration = require("../../models/Registration");
+const Proposal = require("../../models/Proposal");
 const createVolunteer = async (req, res) => {
   try {
     const { name, age, city, college, education, why } = req.body;
@@ -140,9 +143,129 @@ const createTherapyPlusHost = async (req, res) => {
     res.status(400).json({ success: false, error: error.message });
   }
 };
+
+const createSession = async (req, res) => {
+  try {
+    const { title, speaker, dateTime, mode, fee } = req.body;
+
+    // Optionally, require createdBy from req.user._id
+    const createdBy = req.user?.id;
+
+    const session = new Session({
+      title,
+      speaker,
+      dateTime,
+      mode,
+      fee,
+      createdBy,
+    });
+
+    await session.save();
+    res.status(201).json(session);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+const register = async (req, res) => {
+  try {
+    const {
+      sessionId,
+      name,
+      age,
+      contact,
+      email,
+      profession,
+      experience,
+      insights,
+    } = req.body;
+
+    // User ID from auth middleware (e.g., req.user._id)
+    const userId = req.user.id;
+
+    // Check session existence
+    const session = await Session.findById(sessionId);
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    // Create registration
+    const registration = new Registration({
+      session: sessionId,
+      name,
+      age,
+      contact,
+      email,
+      profession,
+      experience,
+      insights,
+      user: userId,
+    });
+
+    await registration.save();
+    res.status(201).json({ message: "Registered successfully", registration });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res
+        .status(409)
+        .json({ error: "Already registered for this session" });
+    }
+    res.status(400).json({ error: err.message });
+  }
+};
+
+const submitProposal = async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      background,
+      bio,
+      topic,
+      hasExperience,
+      audience,
+      mode,
+      preferredDates,
+    } = req.body;
+
+    // User ID from auth middleware (e.g., req.user._id)
+    const userId = req.user.id;
+
+    const proposal = new Proposal({
+      name,
+      email,
+      background,
+      bio,
+      topic,
+      hasExperience,
+      audience,
+      mode,
+      preferredDates,
+      user: userId,
+    });
+
+    await proposal.save();
+    res.status(201).json({ message: "Proposal submitted", proposal });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+const getActiveSession = async (req, res) => {
+  try {
+    const session = await Session.findOne({ active: true });
+    if (!session)
+      return res.status(404).json({ error: "No active session found" });
+    res.json(session);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 module.exports = {
   createVolunteer,
   createOrgCampRequest,
   createTherapyPlusJoin,
   createTherapyPlusHost,
+  createSession,
+  register,
+  submitProposal,
+  getActiveSession,
 };
