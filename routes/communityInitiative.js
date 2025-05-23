@@ -60,4 +60,10 @@ router.get(
   verifyToken,
   communityInitiativeController.getActiveSession
 );
+
+router.post(
+  "/not-sure",
+  verifyToken,
+  communityInitiativeController.createNotSure
+);
 module.exports = router;

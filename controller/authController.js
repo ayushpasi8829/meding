@@ -92,31 +92,71 @@ exports.verifyOtp = async (req, res) => {
 
 // Middleware required: verifyToken (JWT validation)
 
+// exports.completeRegistration = async (req, res) => {
+//   const { fullname, email, location, reason } = req.body;
+//   const userId = req.user.id; // extracted from JWT via middleware
+
+//   if (!fullname || !email || !location || !reason) {
+//     return res
+//       .status(400)
+//       .json({ success: false, message: "All fields are required" });
+//   }
+
+//   try {
+//     let user = await User.findById(userId);
+
+//     if (!user) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "User not found" });
+//     }
+
+//     user.fullname = fullname;
+//     user.email = email;
+//     user.location = location;
+//     user.reason = reason;
+
+//     await user.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: "User information updated successfully",
+//       data: {
+//         id: user._id,
+//         fullname: user.fullname,
+//         email: user.email,
+//         mobile: user.mobile,
+//         location: user.location,
+//         reason: user.reason,
+//       },
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.completeRegistration = async (req, res) => {
   const { fullname, email, location, reason } = req.body;
-  const userId = req.user.id; // extracted from JWT via middleware
 
+  // Check all required fields
   if (!fullname || !email || !location || !reason) {
-    return res
-      .status(400)
-      .json({ success: false, message: "All fields are required" });
+    return res.status(400).json({
+      success: false,
+      message: "All fields are required",
+    });
   }
 
   try {
-    let user = await User.findById(userId);
-
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    }
-
-    user.fullname = fullname;
-    user.email = email;
-    user.location = location;
-    user.reason = reason;
-
-    await user.save();
+    // Use upsert to update if exists, or create if not
+    const user = await User.findOneAndUpdate(
+      { email },
+      { $set: { fullname, location, reason } },
+      {
+        new: true, // return the modified document
+        upsert: true, // create if not found
+        setDefaultsOnInsert: true, // set default values for new docs
+      }
+    );
 
     res.status(200).json({
       success: true,
@@ -131,7 +171,10 @@ exports.completeRegistration = async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 

@@ -7,6 +7,7 @@ const OrgCampRequest = require("../../models/OrgCampRequest");
 const Session = require("../../models/Session");
 const Registration = require("../../models/Registration");
 const Proposal = require("../../models/Proposal");
+const NotSure = require("../../models/NotSure");
 const createVolunteer = async (req, res) => {
   try {
     const { name, age, city, college, education, why } = req.body;
@@ -259,6 +260,92 @@ const getActiveSession = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// Create a new "NotSure" booking
+exports.createNotSure = async (req, res) => {
+  try {
+    const { userId, concerns, date, timeSlot } = req.body;
+
+    // Optional: Prevent double booking for the same time slot and date
+    const existing = await NotSure.findOne({ date, timeSlot });
+    if (existing) {
+      return res
+        .status(409)
+        .json({ message: "This time slot is already booked." });
+    }
+
+    const newBooking = new NotSure({
+      user: userId,
+      concerns,
+      date,
+      timeSlot,
+    });
+
+    await newBooking.save();
+
+    res.status(201).json({
+      message: "Booking created successfully.",
+      booking: newBooking,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// Create a new "NotSure" booking
+exports.createNotSure = async (req, res) => {
+  try {
+    const { userId, concerns, date, timeSlot } = req.body;
+
+    // Optional: Prevent double booking for the same time slot and date
+    const existing = await NotSure.findOne({ date, timeSlot });
+    if (existing) {
+      return res
+        .status(409)
+        .json({ message: "This time slot is already booked." });
+    }
+
+    const newBooking = new NotSure({
+      user: userId,
+      concerns,
+      date,
+      timeSlot,
+    });
+
+    await newBooking.save();
+
+    res.status(201).json({
+      message: "Booking created successfully.",
+      booking: newBooking,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+// Create a new "NotSure" booking
+const createNotSure = async (req, res) => {
+  try {
+    const { concerns, date, timeSlot } = req.body;
+    const userId = req.user.id;
+
+    const newBooking = new NotSure({
+      user: userId,
+      concerns,
+      date,
+      timeSlot,
+    });
+
+    await newBooking.save();
+
+    res.status(201).json({
+      message: "Booking created successfully.",
+      booking: newBooking,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
 module.exports = {
   createVolunteer,
   createOrgCampRequest,
@@ -268,4 +355,5 @@ module.exports = {
   register,
   submitProposal,
   getActiveSession,
+  createNotSure,
 };
