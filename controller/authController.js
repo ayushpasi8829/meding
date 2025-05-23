@@ -86,60 +86,15 @@ exports.verifyOtp = async (req, res) => {
       },
     });
   } catch (err) {
+    console.log("Error verifying OTP:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Middleware required: verifyToken (JWT validation)
+exports.register = async (req, res) => {
+  const { fullname, email, mobile, location, reason } = req.body;
 
-// exports.completeRegistration = async (req, res) => {
-//   const { fullname, email, location, reason } = req.body;
-//   const userId = req.user.id; // extracted from JWT via middleware
-
-//   if (!fullname || !email || !location || !reason) {
-//     return res
-//       .status(400)
-//       .json({ success: false, message: "All fields are required" });
-//   }
-
-//   try {
-//     let user = await User.findById(userId);
-
-//     if (!user) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "User not found" });
-//     }
-
-//     user.fullname = fullname;
-//     user.email = email;
-//     user.location = location;
-//     user.reason = reason;
-
-//     await user.save();
-
-//     res.status(200).json({
-//       success: true,
-//       message: "User information updated successfully",
-//       data: {
-//         id: user._id,
-//         fullname: user.fullname,
-//         email: user.email,
-//         mobile: user.mobile,
-//         location: user.location,
-//         reason: user.reason,
-//       },
-//     });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-exports.completeRegistration = async (req, res) => {
-  const { fullname, email, location, reason } = req.body;
-
-  // Check all required fields
-  if (!fullname || !email || !location || !reason) {
+  if (!fullname || !email || !mobile || !location || !reason) {
     return res.status(400).json({
       success: false,
       message: "All fields are required",
@@ -147,34 +102,106 @@ exports.completeRegistration = async (req, res) => {
   }
 
   try {
-    // Use upsert to update if exists, or create if not
-    const user = await User.findOneAndUpdate(
-      { email },
-      { $set: { fullname, location, reason } },
-      {
-        new: true, // return the modified document
-        upsert: true, // create if not found
-        setDefaultsOnInsert: true, // set default values for new docs
-      }
-    );
+    let user = await User.findOne({ mobile });
 
-    res.status(200).json({
+    // const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = 123456;
+    const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    if (!user) {
+      user = new User({
+        fullname,
+        email,
+        mobile,
+        countryCode,
+        location,
+        reason,
+        isMobileVerified: false,
+        otp,
+        otpExpiresAt,
+        role: "user",
+      });
+    } else {
+      // Update OTP for existing but unverified users
+      user.otp = otp;
+      user.otpExpiresAt = otpExpiresAt;
+      // Optionally update other fields if you want to allow edits before verification
+      user.fullname = fullname;
+      user.email = email;
+      user.location = location;
+      user.reason = reason;
+    }
+
+    await user.save();
+
+    // Send OTP via SMS here
+
+    res.status(201).json({
       success: true,
-      message: "User information updated successfully",
+      message: "Registration successful. OTP sent to your mobile.",
       data: {
-        id: user._id,
         fullname: user.fullname,
         email: user.email,
         mobile: user.mobile,
         location: user.location,
-        reason: user.reason,
+        otp: user.otp, // ⚠️ Remove or mask this in production!
+        otpExpiresAt: user.otpExpiresAt,
+        isMobileVerified: user.isMobileVerified,
+        role: user.role,
       },
     });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message,
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.verifyOtp = async (req, res) => {
+  const { mobile, otp } = req.body;
+
+  if (!mobile || !otp) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Mobile and OTP are required" });
+  }
+
+  try {
+    const user = await User.findOne({ mobile });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    if (user.otp !== otp || user.otpExpiresAt < new Date()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired OTP" });
+    }
+
+    user.isMobileVerified = true;
+    user.otp = undefined;
+    user.otpExpiresAt = undefined;
+    await user.save();
+
+    // Generate JWT token here
+    const token = jwt.sign(
+      { id: user._id, role: user.role, mobile: user.mobile },
+      "SECRET_KEY" // use env variable in production!
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "OTP verified successfully",
+      data: {
+        id: user._id,
+        mobile: user.mobile,
+        isMobileVerified: user.isMobileVerified,
+        token, // token sent to client
+      },
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
@@ -296,5 +323,72 @@ exports.login = async (req, res) => {
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+exports.gameForm = async (req, res) => {
+  const { fullname, email, mobile, location } = req.body;
+  console.log("Form Data Received:", {
+    fullname,
+    email,
+    mobile,
+    location,
+  });
+
+  if (!fullname || !email || !mobile || !location) {
+    return res.status(400).json({
+      success: false,
+      message: "All fields are required",
+    });
+  }
+
+  try {
+    let user = await User.findOne({ mobile });
+
+    // const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = 123456;
+    const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    if (!user) {
+      user = new User({
+        fullname,
+        email,
+        mobile,
+        location,
+        isMobileVerified: false,
+        otp,
+        otpExpiresAt,
+        role: "user",
+      });
+    } else {
+      // Update OTP for existing but unverified users
+      user.otp = otp;
+      user.otpExpiresAt = otpExpiresAt;
+      // Optionally update other fields if you want to allow edits before verification
+      user.fullname = fullname;
+      user.email = email;
+      user.location = location;
+    }
+
+    await user.save();
+
+    // Send OTP via SMS here
+
+    res.status(201).json({
+      success: true,
+      message: "Registration successful. OTP sent to your mobile.",
+      data: {
+        fullname: user.fullname,
+        email: user.email,
+        mobile: user.mobile,
+        location: user.location,
+
+        otpExpiresAt: user.otpExpiresAt,
+        isMobileVerified: user.isMobileVerified,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };

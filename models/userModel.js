@@ -4,7 +4,7 @@ const userSchema = new mongoose.Schema({
   fullname: { type: String },
   email: { type: String, unique: true },
   mobile: { type: String, required: true, unique: true },
-  countryCode: { type: String, required: true },
+  countryCode: { type: String },
   role: { type: String, enum: ["doctor", "admin", "user"], required: true },
   location: { type: String },
   reason: {
