@@ -113,7 +113,7 @@ exports.register = async (req, res) => {
         fullname,
         email,
         mobile,
-        countryCode,
+
         location,
         reason,
         isMobileVerified: false,
