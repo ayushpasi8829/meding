@@ -262,7 +262,7 @@ const getBase64Image = (filePath) => {
 };
 
 exports.generatePdf = async (req, res) => {
-  const url = `http://localhost:5173/report`;
+  const url = `https://kp2wh2g7-5173.inc1.devtunnels.ms/report`;
 
   try {
     const browser = await puppeteer.launch({
