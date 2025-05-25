@@ -16,4 +16,6 @@ router.get("/summary", verifyToken, doctorController.getScoreSummary);
 router.get("/report", verifyToken, doctorController.generatePdfReport);
 
 router.get("/get-questions", doctorController.getQuestions);
+
+router.get("/pdf", doctorController.generatePdf);
 module.exports = router;

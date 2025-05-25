@@ -4,7 +4,8 @@ const User = require("../../models/userModel");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
-
+const puppeteer = require("puppeteer");
+const os = require("os");
 exports.submitAnswer = async (req, res) => {
   const userId = req.user?.id;
   const { questionId, answer } = req.body;
@@ -23,11 +24,12 @@ exports.submitAnswer = async (req, res) => {
         .json({ success: false, message: "Question not found" });
     }
 
-  
     if (!question.options.includes(answer)) {
       return res.status(400).json({
         success: false,
-        message: `Invalid answer. Allowed options are: ${question.options.join(", ")}`,
+        message: `Invalid answer. Allowed options are: ${question.options.join(
+          ", "
+        )}`,
       });
     }
 
@@ -70,19 +72,22 @@ exports.generatePdfReport = async (req, res) => {
 
   try {
     const user = await User.findById(userId);
-    const answers = await UserAnswer.find({ user: userId }).populate("question");
+    const answers = await UserAnswer.find({ user: userId }).populate(
+      "question"
+    );
 
     if (!answers.length) {
-      return res.status(400).json({ success: false, message: "No answers found" });
+      return res
+        .status(400)
+        .json({ success: false, message: "No answers found" });
     }
 
- 
     let score = 0;
     const answerPoints = {
       "Almost Always": 1,
-      "Often": 2,
-      "Sometimes": 3,
-      "Rarely": 4,
+      Often: 2,
+      Sometimes: 3,
+      Rarely: 4,
     };
 
     answers.forEach((ans) => {
@@ -92,12 +97,10 @@ exports.generatePdfReport = async (req, res) => {
     const maxScore = answers.length * 4;
     const minScore = answers.length * 1;
 
-   
     let interpretation = "Needs Care";
     if (score >= 24) interpretation = "Thriving";
     else if (score >= 18) interpretation = "Balanced";
 
-  
     const reportsDir = path.join(__dirname, "../../reports");
     if (!fs.existsSync(reportsDir)) {
       fs.mkdirSync(reportsDir, { recursive: true });
@@ -106,7 +109,6 @@ exports.generatePdfReport = async (req, res) => {
     const fileName = `mental_health_report_${user._id}.pdf`;
     const filePath = path.join(reportsDir, fileName);
 
-   
     const doc = new PDFDocument();
     const stream = fs.createWriteStream(filePath);
     doc.pipe(stream);
@@ -129,7 +131,9 @@ exports.generatePdfReport = async (req, res) => {
     doc.fontSize(16).text("Question-wise Summary", { underline: true });
     answers.forEach((ans, index) => {
       doc.fontSize(12).text(`${index + 1}. ${ans.question.question}`);
-      doc.font("Helvetica-Bold").text(`→ Your Answer: ${ans.answer}`, { indent: 20 });
+      doc
+        .font("Helvetica-Bold")
+        .text(`→ Your Answer: ${ans.answer}`, { indent: 20 });
       doc.moveDown(0.5);
     });
 
@@ -152,7 +156,9 @@ exports.getScoreSummary = async (req, res) => {
   const userId = req.user?.id;
 
   try {
-    const answers = await UserAnswer.find({ user: userId }).populate('question');
+    const answers = await UserAnswer.find({ user: userId }).populate(
+      "question"
+    );
 
     if (!answers.length) {
       return res.status(400).json({
@@ -163,9 +169,9 @@ exports.getScoreSummary = async (req, res) => {
 
     const answerPoints = {
       "Almost Always": 1,
-      "Often": 2,
-      "Sometimes": 3,
-      "Rarely": 4,
+      Often: 2,
+      Sometimes: 3,
+      Rarely: 4,
     };
 
     let totalScore = 0;
@@ -185,11 +191,14 @@ exports.getScoreSummary = async (req, res) => {
     // General interpretation
     let generalMessage = "";
     if (totalScore >= 24) {
-      generalMessage = "Thriving - You're doing really well. Keep nurturing yourself. Therapy can still deepen your self-awareness and personal growth.";
+      generalMessage =
+        "Thriving - You're doing really well. Keep nurturing yourself. Therapy can still deepen your self-awareness and personal growth.";
     } else if (totalScore >= 18) {
-      generalMessage = "Balanced - You're managing most things with grace. Therapy can support you in staying aligned and growing.";
+      generalMessage =
+        "Balanced - You're managing most things with grace. Therapy can support you in staying aligned and growing.";
     } else {
-      generalMessage = "Needs Care - You might be feeling a little off lately, and that's okay. Therapy can offer a compassionate space to reflect, heal, and reset.";
+      generalMessage =
+        "Needs Care - You might be feeling a little off lately, and that's okay. Therapy can offer a compassionate space to reflect, heal, and reset.";
     }
 
     // Helper to interpret each category
@@ -234,5 +243,62 @@ exports.getQuestions = async (req, res) => {
       message: "Failed to fetch questions",
       error: error.message,
     });
+  }
+};
+
+// Load images from the "public" folder (if needed)
+const getBase64Image = (filePath) => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      console.error(`File not found: ${filePath}`);
+      return null;
+    }
+    const imageBuffer = fs.readFileSync(filePath);
+    return `data:image/png;base64,${imageBuffer.toString("base64")}`;
+  } catch (error) {
+    console.error(`Error loading image: ${filePath}`, error);
+    return null;
+  }
+};
+
+exports.generatePdf = async (req, res) => {
+  const url = `http://localhost:5173/report`;
+
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    const page = await browser.newPage();
+
+    await page.goto(url, { waitUntil: "networkidle2" });
+
+    // Wait for 1 second to ensure dynamic content loads (use setTimeout if waitForTimeout not available)
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const tempFilePath = path.join(os.tmpdir(), `report-${Date.now()}.pdf`);
+
+    await page.pdf({
+      path: tempFilePath,
+      format: "A4",
+      printBackground: true,
+      margin: { top: "0px", bottom: "0px", left: "0px", right: "0px" },
+    });
+
+    await browser.close();
+
+    const pdfBuffer = fs.readFileSync(tempFilePath);
+    fs.unlinkSync(tempFilePath);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=${"report"}.pdf`
+    );
+    res.status(200).send(pdfBuffer);
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    res.status(500).json({ error: "Error generating PDF" });
   }
 };
