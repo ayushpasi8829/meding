@@ -15,12 +15,6 @@ exports.submitAnswer = async (req, res) => {
       .json({ success: false, message: "Question ID and answer are required" });
   }
 
-  if (!["Almost Always", "Often", "Sometimes", "Rarely"].includes(answer)) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Invalid answer selected" });
-  }
-
   try {
     const question = await QuizQuestion.findById(questionId);
     if (!question) {
@@ -29,13 +23,20 @@ exports.submitAnswer = async (req, res) => {
         .json({ success: false, message: "Question not found" });
     }
 
+  
+    if (!question.options.includes(answer)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid answer. Allowed options are: ${question.options.join(", ")}`,
+      });
+    }
+
     const existingAnswer = await UserAnswer.findOne({
       user: userId,
       question: questionId,
     });
 
     if (existingAnswer) {
-      // Update existing answer
       existingAnswer.answer = answer;
       await existingAnswer.save();
       return res.status(200).json({
@@ -69,31 +70,34 @@ exports.generatePdfReport = async (req, res) => {
 
   try {
     const user = await User.findById(userId);
-    const answers = await UserAnswer.find({ user: userId }).populate(
-      "question"
-    );
+    const answers = await UserAnswer.find({ user: userId }).populate("question");
 
     if (!answers.length) {
-      return res
-        .status(400)
-        .json({ success: false, message: "No answers found" });
+      return res.status(400).json({ success: false, message: "No answers found" });
     }
 
-    // 🔍 Basic Scoring
+ 
     let score = 0;
+    const answerPoints = {
+      "Almost Always": 1,
+      "Often": 2,
+      "Sometimes": 3,
+      "Rarely": 4,
+    };
+
     answers.forEach((ans) => {
-      if (ans.answer === "Yes") score += 2;
-      else if (ans.answer === "Maybe") score += 1;
-      // No = 0
+      score += answerPoints[ans.answer] || 0;
     });
 
-    const maxScore = answers.length * 2;
-    const percentage = (score / maxScore) * 100;
+    const maxScore = answers.length * 4;
+    const minScore = answers.length * 1;
 
-    let stressLevel = "Low";
-    if (percentage > 70) stressLevel = "High";
-    else if (percentage > 40) stressLevel = "Medium";
+   
+    let interpretation = "Needs Care";
+    if (score >= 24) interpretation = "Thriving";
+    else if (score >= 18) interpretation = "Balanced";
 
+  
     const reportsDir = path.join(__dirname, "../../reports");
     if (!fs.existsSync(reportsDir)) {
       fs.mkdirSync(reportsDir, { recursive: true });
@@ -102,7 +106,7 @@ exports.generatePdfReport = async (req, res) => {
     const fileName = `mental_health_report_${user._id}.pdf`;
     const filePath = path.join(reportsDir, fileName);
 
-    // 📄 Create PDF
+   
     const doc = new PDFDocument();
     const stream = fs.createWriteStream(filePath);
     doc.pipe(stream);
@@ -119,16 +123,13 @@ exports.generatePdfReport = async (req, res) => {
     doc.moveDown(0.5);
     doc.fontSize(14).text(`Total Questions: ${answers.length}`);
     doc.text(`Score: ${score} / ${maxScore}`);
-    doc.text(`Stress Level: ${stressLevel}`);
-    doc.text(`Mental Health %: ${percentage.toFixed(2)}%`);
+    doc.text(`Interpretation: ${interpretation}`);
     doc.moveDown();
 
     doc.fontSize(16).text("Question-wise Summary", { underline: true });
     answers.forEach((ans, index) => {
       doc.fontSize(12).text(`${index + 1}. ${ans.question.question}`);
-      doc
-        .font("Helvetica-Bold")
-        .text(`→ Your Answer: ${ans.answer}`, { indent: 20 });
+      doc.font("Helvetica-Bold").text(`→ Your Answer: ${ans.answer}`, { indent: 20 });
       doc.moveDown(0.5);
     });
 
@@ -143,6 +144,82 @@ exports.generatePdfReport = async (req, res) => {
     });
   } catch (err) {
     console.error("PDF Report Error:", err);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+exports.getScoreSummary = async (req, res) => {
+  const userId = req.user?.id;
+
+  try {
+    const answers = await UserAnswer.find({ user: userId }).populate('question');
+
+    if (!answers.length) {
+      return res.status(400).json({
+        success: false,
+        message: "No answers found",
+      });
+    }
+
+    const answerPoints = {
+      "Almost Always": 1,
+      "Often": 2,
+      "Sometimes": 3,
+      "Rarely": 4,
+    };
+
+    let totalScore = 0;
+    let anxietyScore = 0;
+    let stressScore = 0;
+    let depressionScore = 0;
+
+    answers.forEach((ans, index) => {
+      const point = answerPoints[ans.answer] || 0;
+      totalScore += point;
+
+      if (index < 7) anxietyScore += point;
+      else if (index < 14) stressScore += point;
+      else depressionScore += point;
+    });
+
+    // General interpretation
+    let generalMessage = "";
+    if (totalScore >= 24) {
+      generalMessage = "Thriving - You're doing really well. Keep nurturing yourself. Therapy can still deepen your self-awareness and personal growth.";
+    } else if (totalScore >= 18) {
+      generalMessage = "Balanced - You're managing most things with grace. Therapy can support you in staying aligned and growing.";
+    } else {
+      generalMessage = "Needs Care - You might be feeling a little off lately, and that's okay. Therapy can offer a compassionate space to reflect, heal, and reset.";
+    }
+
+    // Helper to interpret each category
+    const interpret = (score) => {
+      if (score >= 24) return "High";
+      if (score >= 18) return "Moderate";
+      return "Low";
+    };
+
+    res.status(200).json({
+      success: true,
+      totalScore,
+      message: generalMessage,
+      details: {
+        anxiety: {
+          score: anxietyScore,
+          level: interpret(anxietyScore),
+        },
+        stress: {
+          score: stressScore,
+          level: interpret(stressScore),
+        },
+        depression: {
+          score: depressionScore,
+          level: interpret(depressionScore),
+        },
+      },
+    });
+  } catch (err) {
+    console.error("Score Summary Error:", err);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };

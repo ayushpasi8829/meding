@@ -11,4 +11,6 @@ router.post("/session/cancel", verifyToken, isDoctor,doctorController.cancelAppo
 
 router.post("/session/notes", verifyToken, isDoctor,doctorController.addNotesToAppointment);
 
+router.get("/today-appointments", verifyToken, isDoctor, doctorController.getTodayAppointments);
+router.get("/upcoming-appointments", verifyToken, isDoctor, doctorController.getUpcomingAppointments);
 module.exports = router;

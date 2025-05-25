@@ -155,56 +155,6 @@ exports.register = async (req, res) => {
   }
 };
 
-exports.verifyOtp = async (req, res) => {
-  const { mobile, otp } = req.body;
-
-  if (!mobile || !otp) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Mobile and OTP are required" });
-  }
-
-  try {
-    const user = await User.findOne({ mobile });
-
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    }
-
-    if (user.otp !== otp || user.otpExpiresAt < new Date()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid or expired OTP" });
-    }
-
-    user.isMobileVerified = true;
-    user.otp = undefined;
-    user.otpExpiresAt = undefined;
-    await user.save();
-
-    // Generate JWT token here
-    const token = jwt.sign(
-      { id: user._id, role: user.role, mobile: user.mobile },
-      "SECRET_KEY" // use env variable in production!
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "OTP verified successfully",
-      data: {
-        id: user._id,
-        mobile: user.mobile,
-        isMobileVerified: user.isMobileVerified,
-        token, // token sent to client
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
 exports.doctorSignup = async (req, res) => {
   console.log("droctor signup called", req.body);
   const {

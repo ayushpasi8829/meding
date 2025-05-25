@@ -23,12 +23,7 @@ router.post("/corporateWellness", verifyToken, isUser, userController.submitCorp
 //Internship
 router.post("/internship", verifyToken, isUser, userController.submitInternshipForm );
 
-router.get(
-  "/session/request",
-  verifyToken,
-  isUser,
-  userController.createSessionRequest
-);
+router.get("/session/request", verifyToken, isUser, userController.createSessionRequest );
 
 router.post("/add-plan", planController.addPlan);
 
@@ -36,8 +31,7 @@ router.post("/select-plan", verifyToken, isUser, planController.selectPlan);
 router.get("/get-selectedplan", verifyToken, isUser, planController.getSelectedPlan
 );
 
-router.get(
-  "/get-plans", planController.getAllPlans);
+router.get("/get-plans", planController.getAllPlans);
 
 
 //client panel 

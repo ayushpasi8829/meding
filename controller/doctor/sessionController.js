@@ -1,6 +1,7 @@
 const User = require("../../models/userModel");
 const Appointment = require("../../models/Appointment");
 const sendMessage = require("../../utils/sendMessage");
+const moment = require("moment");
 
 exports.getDoctorSessionRequests = async (req, res) => {
     const doctorId = req.user?.id;
@@ -21,55 +22,54 @@ exports.getDoctorSessionRequests = async (req, res) => {
     }
   };
 
+exports.acceptSessionRequest = async (req, res) => {
+  const doctorId = req.user?.id;
+  const { sessionId, meetingLink} = req.body;
 
-  exports.acceptSessionRequest = async (req, res) => {
-    const doctorId = req.user?.id;
-    const { sessionId, meetingLink} = req.body;
-  
-    if (!sessionId || !meetingLink ) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required",
-      });
+  if (!sessionId || !meetingLink ) {
+    return res.status(400).json({
+      success: false,
+      message: "All fields are required",
+    });
+  }
+
+  try {
+    const session = await Appointment.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ success: false, message: "Session not found" });
     }
-  
-    try {
-      const session = await Appointment.findById(sessionId);
-      if (!session) {
-        return res.status(404).json({ success: false, message: "Session not found" });
-      }
-  
-      if (session.doctor.toString() !== doctorId) {
-        return res.status(403).json({ success: false, message: "Unauthorized access" });
-      }
-  
-      // Update session
-      session.meetLink = meetingLink;
-      session.status = 'scheduled';
-      await Appointment.save();
-  
-      // Get user details for notification
-      const user = await User.findById(session.patient);
-      if (!user) {
-        return res.status(404).json({ success: false, message: "User not found" });
-      }
-  
-      const fullPhone = `${user.countryCode}${user.mobile}`;
-      const message = `Hi ${user.fullname}, your session has been accepted.\nMeeting Link: ${meetingLink}\nTime: ${new Date(startTime).toLocaleString()} - ${new Date(endTime).toLocaleString()}`;
-  
-      // Send message (WhatsApp/SMS + Email)
-      await sendMessage(fullPhone, message, user.email);
-  
-      res.status(200).json({
-        success: true,
-        message: "Session request accepted and user notified",
-        data: session,
-      });
-    } catch (err) {
-      console.error("Accept Session Error:", err);
-      res.status(500).json({ success: false, message: "Server Error" });
+
+    if (session.doctor.toString() !== doctorId) {
+      return res.status(403).json({ success: false, message: "Unauthorized access" });
     }
-  };
+
+    // Update session
+    session.meetLink = meetingLink;
+    session.status = 'scheduled';
+    await Appointment.save();
+
+    // Get user details for notification
+    const user = await User.findById(session.patient);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const fullPhone = `${user.countryCode}${user.mobile}`;
+    const message = `Hi ${user.fullname}, your session has been accepted.\nMeeting Link: ${meetingLink}\nTime: ${new Date(startTime).toLocaleString()} - ${new Date(endTime).toLocaleString()}`;
+
+    // Send message (WhatsApp/SMS + Email)
+    await sendMessage(fullPhone, message, user.email);
+
+    res.status(200).json({
+      success: true,
+      message: "Session request accepted and user notified",
+      data: session,
+    });
+  } catch (err) {
+    console.error("Accept Session Error:", err);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
   
 exports.cancelAppointment = async (req, res) => {
   const doctorId = req.user?.id;
@@ -174,5 +174,52 @@ exports.addNotesToAppointment = async (req, res) => {
       success: false,
       message: "Server Error",
     });
+  }
+};
+
+exports.getTodayAppointments = async (req, res) => {
+  try {
+    const doctorId = req.user.id;
+    const todayStart = moment().startOf("day").toDate();
+    const todayEnd = moment().endOf("day").toDate();
+
+    const appointments = await Appointment.find({
+      doctor: doctorId,
+      date: { $gte: todayStart, $lte: todayEnd },
+      status: "scheduled"
+    })
+    .populate("patient", "fullname email")
+    .sort({ date: 1 });
+
+    res.status(200).json({
+      success: true,
+      appointments,
+    });
+  } catch (error) {
+    console.error("Error fetching today's appointments:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+exports.getUpcomingAppointments = async (req, res) => {
+  try {
+    const doctorId = req.user.id;
+    const now = new Date();
+
+    const appointments = await Appointment.find({
+      doctor: doctorId,
+      date: { $gt: now },
+      status: "scheduled"
+    })
+    .populate("patient", "fullname email")
+    .sort({ date: 1 });
+
+    res.status(200).json({
+      success: true,
+      appointments,
+    });
+  } catch (error) {
+    console.error("Error fetching upcoming appointments:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
