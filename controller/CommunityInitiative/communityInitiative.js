@@ -8,6 +8,9 @@ const Session = require("../../models/Session");
 const Registration = require("../../models/Registration");
 const Proposal = require("../../models/Proposal");
 const NotSure = require("../../models/NotSure");
+const GroupTherapySession = require("../../models/GroupTherapySession");
+const GroupTherapyRegistration = require("../../models/GroupTherapyRegistration");
+const mongoose = require("mongoose");
 const createVolunteer = async (req, res) => {
   try {
     const { name, age, city, college, education, why } = req.body;
@@ -346,6 +349,95 @@ const createNotSure = async (req, res) => {
     res.status(500).json({ message: "Server error", error });
   }
 };
+
+const createGrouptherapySession = async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      therapist,
+      date,
+      time,
+      mode,
+      fee,
+      topics,
+      zoomLink,
+    } = req.body;
+
+    const session = new GroupTherapySession({
+      title,
+      description,
+      therapist,
+      date,
+      time,
+      mode,
+      fee,
+      topics,
+      zoomLink,
+    });
+
+    await session.save();
+    res.status(201).json({ message: "Session added successfully.", session });
+  } catch (err) {
+    res
+      .status(400)
+      .json({ error: "Failed to add session.", details: err.message });
+  }
+};
+
+const getCurrentSession = async (req, res) => {
+  try {
+    const now = new Date();
+    let session = await GroupTherapySession.findOne({
+      date: { $gte: now },
+    }).sort({ date: 1 });
+
+    if (!session) {
+      session = await GroupTherapySession.findOne().sort({ date: -1 });
+    }
+
+    if (!session) {
+      return res.status(404).json({ message: "No session found." });
+    }
+    res.json(session);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch session." });
+  }
+};
+const registerForSession = async (req, res) => {
+  try {
+    const { sessionId, name, age, contact, email, profession, specific } =
+      req.body;
+
+    // Validate sessionId
+    if (!sessionId || !mongoose.Types.ObjectId.isValid(sessionId)) {
+      return res.status(400).json({ error: "A valid sessionId is required." });
+    }
+
+    // Find the session by ID
+    const session = await GroupTherapySession.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: "Session not found." });
+    }
+
+    const registration = new GroupTherapyRegistration({
+      session: session._id,
+      name,
+      age,
+      contact,
+      email,
+      profession,
+      specific,
+    });
+    await registration.save();
+
+    res.status(201).json({ message: "Registration successful." });
+  } catch (err) {
+    res
+      .status(400)
+      .json({ error: "Registration failed.", details: err.message });
+  }
+};
 module.exports = {
   createVolunteer,
   createOrgCampRequest,
@@ -356,4 +448,7 @@ module.exports = {
   submitProposal,
   getActiveSession,
   createNotSure,
+  createGrouptherapySession,
+  getCurrentSession,
+  registerForSession,
 };

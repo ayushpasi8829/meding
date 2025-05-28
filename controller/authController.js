@@ -161,26 +161,20 @@ exports.doctorSignup = async (req, res) => {
     fullname,
     email,
     mobile,
-    countryCode,
+
     password,
     gender,
-    dob,
+
     therapyCategory,
-    availability, // expected as { startTime: "09:00", endTime: "17:00" }
   } = req.body;
 
   if (
     !fullname ||
     !email ||
     !mobile ||
-    !countryCode ||
     !password ||
     !gender ||
-    !dob ||
-    !therapyCategory ||
-    !availability ||
-    !availability.startTime ||
-    !availability.endTime
+    !therapyCategory
   ) {
     return res
       .status(400)
@@ -201,13 +195,9 @@ exports.doctorSignup = async (req, res) => {
       fullname,
       email,
       mobile,
-      countryCode,
       password: hashedPassword,
       role: "doctor",
       gender,
-      dob,
-      therapyCategory,
-      availability,
     });
 
     await user.save();
@@ -220,8 +210,6 @@ exports.doctorSignup = async (req, res) => {
         fullname: user.fullname,
         email: user.email,
         role: user.role,
-        therapyCategory: user.therapyCategory,
-        availability: user.availability,
       },
     });
   } catch (err) {
@@ -254,9 +242,7 @@ exports.login = async (req, res) => {
         .json({ success: false, message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, "SECRET_KEY", {
-      expiresIn: "1h",
-    });
+    const token = jwt.sign({ id: user._id, role: user.role }, "SECRET_KEY");
     res.json({
       success: true,
       message: "Login successful",

@@ -66,4 +66,23 @@ router.post(
   verifyToken,
   communityInitiativeController.createNotSure
 );
+
+router.post(
+  "/create-grouptherapy",
+  verifyToken,
+  communityInitiativeController.createGrouptherapySession
+);
+
+// GET /api/group-therapy-sessions/current
+router.get(
+  "/group-therapy-sessions",
+  verifyToken,
+  communityInitiativeController.getCurrentSession
+);
+
+router.post(
+  "/register-grouptherapy",
+  verifyToken,
+  communityInitiativeController.registerForSession
+);
 module.exports = router;
