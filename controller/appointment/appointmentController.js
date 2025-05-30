@@ -220,7 +220,16 @@ const autoBookAppointment = async (req, res) => {
       });
     }
 
-    const dateObj = new Date(date);
+    // FIX: Always parse date as UTC, not local
+    let dateObj;
+    if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const [year, month, day] = date.split("-");
+      dateObj = new Date(
+        Date.UTC(Number(year), Number(month) - 1, Number(day))
+      );
+    } else {
+      dateObj = new Date(date);
+    }
 
     // Step 1: Find doctors with this slot
     const doctorsWithSlot = await DoctorTimeSlot.find({
@@ -242,9 +251,7 @@ const autoBookAppointment = async (req, res) => {
       status: { $in: ["scheduled", "completed"] },
     });
 
-    const bookedDoctorIds = bookedAppointments.map((a) =>
-      a.doctor.toString()
-    );
+    const bookedDoctorIds = bookedAppointments.map((a) => a.doctor.toString());
 
     // Step 3: Filter available doctors
     const availableDoctors = doctorsWithSlot.filter(
@@ -272,7 +279,10 @@ const autoBookAppointment = async (req, res) => {
 
     // Step 6: Send Notification
     const patient = await User.findById(patientId); // Assuming you store patients in the User model
-    const fullPhone = `+${String(patient.countryCode).replace(/\D/g, "")}${String(patient.mobile).replace(/\D/g, "")}`;
+    const fullPhone = `+${String(patient.countryCode).replace(
+      /\D/g,
+      ""
+    )}${String(patient.mobile).replace(/\D/g, "")}`;
 
     const notificationMessage = `Hello ${patient.fullname}, your session with Dr. ${selectedDoctor.doctor.fullname} on ${date} from ${startTime} to ${endTime} has been scheduled successfully.`;
 
@@ -299,8 +309,6 @@ const autoBookAppointment = async (req, res) => {
     });
   }
 };
-
-
 
 module.exports = {
   addOrUpdateTimeSlots,

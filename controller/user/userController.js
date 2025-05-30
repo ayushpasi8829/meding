@@ -431,11 +431,29 @@ exports.getTodaySession = async (req, res) => {
 
     return res.json({
       hasSessionToday: true,
-      session: {
-        date: todaySession.date,
-        timeSlot: todaySession.timeSlot,
-        doctor: todaySession.doctor,
-      }
+      session: todaySession
+    });
+  } catch (err) {
+    console.error("Error checking today's session:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+exports.userSessions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const todaySession = await Appointment.findOne({
+      patient: userId,
+    }).populate("doctor", "name email");
+
+    if (!todaySession) {
+      return res.json({ hasSession: false, message: "No session" });
+    }
+
+    return res.json({
+      hasSession: true,
+      session: todaySession
     });
   } catch (err) {
     console.error("Error checking today's session:", err);
@@ -462,11 +480,8 @@ exports.getUpcomingSession = async (req, res) => {
 
     return res.json({
       hasUpcomingSession: true,
-      session: {
-        date: upcomingSession.date,
-        timeSlot: upcomingSession.timeSlot,
-        doctor: upcomingSession.doctor,
-      }
+      session:upcomingSession
+    
     });
   } catch (err) {
     console.error("Error checking upcoming session:", err);

@@ -50,6 +50,10 @@ const appointmentSchema = new mongoose.Schema({
     ref: "BundleSession",
     default: null,
   },
+  reminderSent: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now,

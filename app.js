@@ -31,9 +31,9 @@ const authRoute = require("./routes/auth");
 app.use("/api/auth", authRoute);
 
 //admin route
-const doctor = require("./routes/admin/doctor");
+const doctor = require("./routes/admin/admin");
 const game = require("./routes/admin/game");
-app.use("/api/doctor", doctor);
+app.use("/api/admin", doctor);
 app.use("/api/game", game);
 
 //Doctor route

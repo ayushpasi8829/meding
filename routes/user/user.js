@@ -37,6 +37,9 @@ router.get("/get-plans", planController.getAllPlans);
 //client panel 
 router.get("/session-summary", verifyToken, isUser, userController.getSessionSummary );
 router.get("/today-session", verifyToken, isUser, userController.getTodaySession );
+
+router.get("/user-session", verifyToken, isUser, userController.userSessions );
+
 router.get("/upcoming-session", verifyToken, isUser, userController.getUpcomingSession );
 
 router.get("/therapy-plan", verifyToken, isUser, userController.getTherapyPlan );

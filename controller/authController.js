@@ -91,6 +91,12 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
+const generateReferralCode = (name) => {
+  const prefix = name.split(" ")[0].substring(0, 3).toUpperCase();
+  const random = Math.floor(1000 + Math.random() * 9000);
+  return `${prefix}${random}`;
+};
+
 exports.register = async (req, res) => {
   const { fullname, email, mobile, location, reason } = req.body;
 
@@ -109,6 +115,7 @@ exports.register = async (req, res) => {
     const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     if (!user) {
+      const referralCode = generateReferralCode(fullname);
       user = new User({
         fullname,
         email,
@@ -118,6 +125,7 @@ exports.register = async (req, res) => {
         reason,
         isMobileVerified: false,
         otp,
+        referralCode,
         otpExpiresAt,
         role: "user",
       });
@@ -156,42 +164,64 @@ exports.register = async (req, res) => {
 };
 
 exports.doctorSignup = async (req, res) => {
-  console.log("droctor signup called", req.body);
-  const {
-    fullname,
-    email,
-    mobile,
-
-    password,
-    gender,
-
-    therapyCategory,
-  } = req.body;
-
-  if (
-    !fullname ||
-    !email ||
-    !mobile ||
-    !password ||
-    !gender ||
-    !therapyCategory
-  ) {
-    return res
-      .status(400)
-      .json({ success: false, message: "All fields are required" });
-  }
-
   try {
-    let user = await User.findOne({ email });
-    if (user) {
+    // Destructure and trim fields
+    let { fullname, email, mobile, password, gender } = req.body;
+
+    // Trim input
+    fullname = fullname ? fullname.trim() : "";
+    email = email ? email.trim().toLowerCase() : "";
+    mobile = mobile ? mobile.trim() : "";
+    gender = gender ? gender.trim().toLowerCase() : "";
+
+    // Validation
+    if (!fullname || !email || !mobile || !password || !gender) {
       return res
         .status(400)
-        .json({ success: false, message: "Doctor already exists" });
+        .json({ success: false, message: "All fields are required" });
     }
 
+    // Email regex (basic)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid email format" });
+    }
+
+    // Mobile number regex (10-15 digits, you can adjust for your requirements)
+    const mobileRegex = /^\d{10,15}$/;
+    if (!mobileRegex.test(mobile)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid mobile number" });
+    }
+
+    // Gender enum check
+    const allowedGenders = ["male", "female", "other"];
+    if (!allowedGenders.includes(gender)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid gender value" });
+    }
+
+    // Check if user exists by email or mobile
+    let existingUser = await User.findOne({
+      $or: [{ email: email }, { mobile: mobile }],
+    });
+    if (existingUser) {
+      // Do not leak which field is duplicate
+      return res.status(400).json({
+        success: false,
+        message: "Account with these details already exists",
+      });
+    }
+
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    user = new User({
+    // Create user
+    const user = new User({
       fullname,
       email,
       mobile,
@@ -213,7 +243,15 @@ exports.doctorSignup = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    // Handle duplicate key error from MongoDB
+    if (err.code === 11000) {
+      // err.keyValue will contain the duplicate field
+      return res.status(400).json({
+        success: false,
+        message: "Account with these details already exists",
+      });
+    }
+    console.error("doctorSignup error:", err);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };
@@ -242,7 +280,9 @@ exports.login = async (req, res) => {
         .json({ success: false, message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, "SECRET_KEY");
+    const token = jwt.sign({ id: user._id, role: user.role }, "SECRET_KEY", {
+      expiresIn: "1h",
+    });
     res.json({
       success: true,
       message: "Login successful",

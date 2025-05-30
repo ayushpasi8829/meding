@@ -42,6 +42,12 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  referralCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  password: { type: String, required: false },
 });
 
 module.exports = mongoose.model("User", userSchema);
