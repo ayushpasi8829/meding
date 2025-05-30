@@ -5,6 +5,29 @@ const moment = require("moment");
 const cron = require("node-cron");
 const DoctorTimeSlot = require("../../models/TimeSlot");
 const mongoose = require("mongoose");
+
+exports.getAllDoctorAppointments = async (req, res) => {
+  const doctorId = req.user?.id;
+
+  try {
+    const appointments = await Appointment.find({ doctor: doctorId })
+      .populate("patient", "fullname email mobile countryCode")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      message: "All appointments for doctor fetched successfully",
+      data: appointments,
+    });
+  } catch (error) {
+    console.error("Fetch Doctor Appointments Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};
+
 exports.getDoctorSessionRequests = async (req, res) => {
   const doctorId = req.user?.id;
 

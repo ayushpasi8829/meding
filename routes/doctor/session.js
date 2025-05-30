@@ -9,6 +9,8 @@ const {
 
 const router = express.Router();
 
+router.get("/appointments", verifyToken, isDoctor, doctorController.getAllDoctorAppointments);
+
 router.get(
   "/session-request/get",
   verifyToken,

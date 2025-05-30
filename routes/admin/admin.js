@@ -4,8 +4,17 @@ const { verifyToken, isDoctor, isAdmin, isUser } = require("../../middleware/aut
 
 const router = express.Router();
 
-router.get("/get/doctor", verifyToken, isAdmin, doctorController.doctorList);
-router.get("/get/user", verifyToken, isAdmin, doctorController.userList);
+router.post("/doctors", verifyToken, isAdmin, doctorController.createDoctor);
+router.get("/doctors", verifyToken, isAdmin, doctorController.getDoctors);
+router.put("/doctors/:id", verifyToken, isAdmin, doctorController.updateDoctor);
+router.delete("/doctors/:id", verifyToken, isAdmin, doctorController.deleteDoctor);
+
+router.post("/users", verifyToken, isAdmin, doctorController.createUser); 
+router.get("/users", verifyToken, isAdmin, doctorController.userList);   
+router.put("/users/:id", verifyToken, isAdmin, doctorController.updateUser); 
+router.delete("/users/:id", verifyToken, isAdmin, doctorController.deleteUser)
+
+
 router.get("/get/session-stats", verifyToken, isAdmin, doctorController.SessionStats);
 router.post("/send", doctorController.sendWhatsAppMessage);
 
