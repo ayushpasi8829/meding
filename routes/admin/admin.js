@@ -19,6 +19,12 @@ router.get("/get/session-stats", verifyToken, isAdmin, doctorController.SessionS
 router.get("/get/sessions", verifyToken, isAdmin, doctorController.getAllAppointments);
 router.get("/get/notification", verifyToken, isAdmin,doctorController.getAdminNotifications);
 
+router.post("/bundle-types", verifyToken, isAdmin, doctorController.createBundleType);
+router.get("/bundle-types", verifyToken, isAdmin, doctorController.getAllBundleTypes);
+router.get("/bundle-types/:id", verifyToken, isAdmin, doctorController.getBundleTypeById);
+router.put("/bundle-types/:id", verifyToken, isAdmin, doctorController.updateBundleType);
+router.delete("/bundle-types/:id", verifyToken, isAdmin, doctorController.deleteBundleType);
+
 router.post("/make-admin", verifyToken, isAdmin,doctorController.makeUserAdmin);
 
 router.post("/send", doctorController.sendWhatsAppMessage);

@@ -1,4 +1,5 @@
 const User = require("../../models/userModel");
+const BundleType = require("../../models/BundleType");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const sendMessage = require("../../utils/sendMessage");
@@ -479,6 +480,113 @@ exports.getAdminNotifications = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// Create a bundle type
+exports.createBundleType = async (req, res) => {
+  try {
+    const { name, sessionCount, price } = req.body;
+
+    if (!name || !sessionCount || !price) {
+      return res.status(400).json({ success: false, message: "All fields are required" });
+    }
+
+    const bundleType = await BundleType.create({ name, sessionCount, price });
+
+    res.status(201).json({
+      success: true,
+      message: "Bundle type created successfully",
+      data: bundleType,
+    });
+  } catch (error) {
+    console.error("Error creating bundle type:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Get all bundle types
+exports.getAllBundleTypes = async (req, res) => {
+  try {
+    const bundles = await BundleType.find();
+    res.status(200).json({
+      success: true,
+      message: "Bundle types fetched successfully",
+      data: bundles,
+    });
+  } catch (error) {
+    console.error("Error fetching bundle types:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Get single bundle type by ID
+exports.getBundleTypeById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const bundle = await BundleType.findById(id);
+
+    if (!bundle) {
+      return res.status(404).json({ success: false, message: "Bundle type not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Bundle type fetched successfully",
+      data: bundle,
+    });
+  } catch (error) {
+    console.error("Error fetching bundle type:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Update bundle type
+exports.updateBundleType = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, sessionCount, price } = req.body;
+
+    const updated = await BundleType.findByIdAndUpdate(
+      id,
+      { name, sessionCount, price },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: "Bundle type not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Bundle type updated successfully",
+      data: updated,
+    });
+  } catch (error) {
+    console.error("Error updating bundle type:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Delete bundle type
+exports.deleteBundleType = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deleted = await BundleType.findByIdAndDelete(id);
+
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: "Bundle type not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Bundle type deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting bundle type:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 
 exports.makeUserAdmin = async (req, res) => {
   try {
