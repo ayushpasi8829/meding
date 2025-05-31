@@ -20,10 +20,6 @@ const userSchema = new mongoose.Schema({
     // required: true
   },
 
-  availability: {
-    startTime: { type: String, default: null },
-    endTime: { type: String, default: null },
-  },
   firstTherapyStatus: {
     type: String,
     enum: ["pending", "done"],

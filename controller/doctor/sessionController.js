@@ -492,3 +492,69 @@ exports.getDoctorSessionStats = async (req, res) => {
     });
   }
 };
+
+exports.completeAppointment = async (req, res) => {
+  try {
+    // Extract doctor ID from the authenticated user object
+    const doctorId = req.user?.id;
+
+    // Extract the session ID from the request body
+    const { sessionId } = req.body;
+
+    // Validate that sessionId is provided
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        message: "sessionId is required",
+      });
+    }
+
+    // Attempt to find the appointment in the database
+    const appointment = await Appointment.findById(sessionId);
+
+    // If not found, return a 404 error
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: "Appointment not found",
+      });
+    }
+
+    // Ensure only the assigned doctor can complete the appointment
+    if (appointment.doctor.toString() !== doctorId) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the assigned doctor can complete this appointment",
+      });
+    }
+
+    // Check if the appointment is already completed, cancelled, or marked as no-show
+    if (["completed", "cancelled", "no-show"].includes(appointment.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot complete an appointment that is already ${appointment.status}`,
+      });
+    }
+
+    // Update the appointment status to 'completed'
+    appointment.status = "completed";
+
+    // Optionally, you could record who updated it and when (audit trail)
+
+    // Save the updated appointment
+    await appointment.save();
+
+    // Respond with success and the updated appointment
+    return res.status(200).json({
+      success: true,
+      message: "Appointment marked as completed",
+      appointment,
+    });
+  } catch (error) {
+    // Handle any server errors
+    return res.status(500).json({
+      success: false,
+      message: "Server error: " + error.message,
+    });
+  }
+};

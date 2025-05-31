@@ -4,6 +4,8 @@ const jwt = require("jsonwebtoken");
 const sendMessage = require("../../utils/sendMessage");
 const Appointment = require("../../models/Appointment");
 const moment = require("moment");
+const ExcelJS = require("exceljs");
+const Notification = require('../../models/Notification');
 
 //doctor------
 exports.createDoctor = async (req, res) => {
@@ -72,15 +74,52 @@ exports.getDoctors = async (req, res) => {
   try {
     const doctors = await User.find({ role: "doctor" });
 
+    if (req.query.export === "excel") {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Doctors");
+
+      worksheet.columns = [
+        { header: "Full Name", key: "fullname", width: 25 },
+        { header: "Email", key: "email", width: 30 },
+        { header: "Mobile", key: "mobile", width: 20 },
+        { header: "Speciality", key: "speciality", width: 25 },
+        { header: "Created At", key: "createdAt", width: 25 },
+      ];
+
+      doctors.forEach((doctor) => {
+        worksheet.addRow({
+          fullname: doctor.fullname,
+          email: doctor.email,
+          mobile: doctor.mobile,
+          speciality: doctor.speciality || "",
+          createdAt: doctor.createdAt?.toISOString(),
+        });
+      });
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=doctors_${Date.now()}.xlsx`
+      );
+
+      await workbook.xlsx.write(res);
+      return res.end();
+    }
+
     res.status(200).json({
       success: true,
       message: "Doctor list fetched successfully",
       data: doctors,
     });
   } catch (err) {
+    console.error("Doctor List Error:", err);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };
+
 
 exports.updateDoctor = async (req, res) => {
   const { id } = req.params;
@@ -144,17 +183,53 @@ exports.deleteDoctor = async (req, res) => {
 
 //users------
 exports.userList = async (req, res) => {
-    try {
-      let users = await User.find({ role: "user" }); 
-  
-      res.status(200).json({ 
-        success: true,
-        message: "User List Fetched Successfully",
-        data: users,
+  try {
+    const users = await User.find({ role: "user" });
+
+    // If `export=excel` is passed, generate and send Excel
+    if (req.query.export === "excel") {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Users");
+
+      worksheet.columns = [
+        { header: "Full Name", key: "fullname", width: 25 },
+        { header: "Email", key: "email", width: 30 },
+        { header: "Mobile", key: "mobile", width: 20 },
+        { header: "Created At", key: "createdAt", width: 25 },
+      ];
+
+      users.forEach((user) => {
+        worksheet.addRow({
+          fullname: user.fullname,
+          email: user.email,
+          mobile: user.mobile,
+          createdAt: user.createdAt?.toISOString(),
+        });
       });
-    } catch (err) {
-      res.status(500).json({ success: false, message: "Server Error" });
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=users_${Date.now()}.xlsx`
+      );
+
+      await workbook.xlsx.write(res);
+      return res.end();
     }
+
+    // Normal JSON response
+    res.status(200).json({
+      success: true,
+      message: "User List Fetched Successfully",
+      data: users,
+    });
+  } catch (err) {
+    console.error("User List Error:", err);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
 };
 
 exports.createUser = async (req, res) => {
@@ -269,8 +344,177 @@ exports.SessionStats = async (req, res) => {
   }
 };
 
+exports.getAllAppointments = async (req, res) => {
+  try {
+    const { filter, date, export: exportType } = req.query;
+    let query = {};
+
+    if (filter === "today") {
+      const today = moment().startOf("day");
+      const tomorrow = moment(today).add(1, "day");
+      query.date = { $gte: today.toDate(), $lt: tomorrow.toDate() };
+    } else if (date) {
+      const selectedDate = moment(date, "YYYY-MM-DD");
+      const nextDay = moment(selectedDate).add(1, "day");
+      query.date = { $gte: selectedDate.toDate(), $lt: nextDay.toDate() };
+    }
+
+    const appointments = await Appointment.find(query)
+      .populate("doctor", "fullname email")
+      .populate("patient", "fullname email mobile")
+      .sort({ date: -1 });
+
+    // 🔄 Excel export logic
+    if (exportType === "excel") {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Appointments");
+
+      // Define columns
+      worksheet.columns = [
+        { header: "Doctor Name", key: "doctorName", width: 25 },
+        { header: "Doctor Email", key: "doctorEmail", width: 25 },
+        { header: "Patient Name", key: "patientName", width: 25 },
+        { header: "Patient Email", key: "patientEmail", width: 25 },
+        { header: "Patient Mobile", key: "patientMobile", width: 20 },
+        { header: "Date", key: "date", width: 15 },
+        { header: "Start Time", key: "startTime", width: 15 },
+        { header: "End Time", key: "endTime", width: 15 },
+        { header: "Status", key: "status", width: 15 },
+      ];
+
+      // Add rows
+      appointments.forEach((appointment) => {
+        worksheet.addRow({
+          doctorName: appointment.doctor?.fullname || "",
+          doctorEmail: appointment.doctor?.email || "",
+          patientName: appointment.patient?.fullname || "",
+          patientEmail: appointment.patient?.email || "",
+          patientMobile: appointment.patient?.mobile || "",
+          date: moment(appointment.date).format("YYYY-MM-DD"),
+          startTime: appointment.timeSlot?.startTime || "",
+          endTime: appointment.timeSlot?.endTime || "",
+          status: appointment.status || "",
+        });
+      });
+
+      // Set response headers
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=appointments_${Date.now()}.xlsx`
+      );
+
+      await workbook.xlsx.write(res);
+      return res.end();
+    }
+
+    // Normal JSON response
+    res.status(200).json({
+      success: true,
+      message: "Appointments fetched successfully",
+      data: appointments,
+    });
+  } catch (err) {
+    console.error("Admin fetch appointments error:", err);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+exports.getAdminNotifications = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, user, status, type, exportExcel } = req.query;
+    const filter = {};
+
+    if (user) filter.user = user;
+    if (status) filter.status = status;
+    if (type) filter.type = type;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const notifications = await Notification.find(filter)
+      .populate('user', 'name email') 
+      .sort({ sentAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Notification.countDocuments(filter);
+
+    // Excel Export
+    if (exportExcel === 'true') {
+      const dataForExcel = notifications.map(n => ({
+        User: n.user?.name || '',
+        Email: n.user?.email || '',
+        Recipient: n.recipient,
+        Message: n.message,
+        Type: n.type,
+        Status: n.status,
+        SentAt: n.sentAt ? new Date(n.sentAt).toLocaleString() : '',
+        Error: n.error || '',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(dataForExcel);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Notifications');
+
+      const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+
+      res.setHeader('Content-Disposition', 'attachment; filename="notifications.xlsx"');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      return res.send(buffer);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Notifications fetched successfully',
+      data: notifications,
+      total,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (error) {
+    console.error('Error fetching notifications:', error.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+exports.makeUserAdmin = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'User ID is required' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(400).json({ success: false, message: 'User is already an admin' });
+    }
+
+    user.role = 'admin';
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `User ${user.name} has been granted admin role`,
+      data: user,
+    });
+  } catch (error) {
+    console.error('Error making user admin:', error.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+
 exports.sendWhatsAppMessage = async (req, res) => {
     const { phone, message, email } = req.body;  
     const response = await sendMessage(phone, message, email);
     res.status(response.success ? 200 : 500).json(response);
   };
+

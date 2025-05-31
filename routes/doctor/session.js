@@ -9,7 +9,12 @@ const {
 
 const router = express.Router();
 
-router.get("/appointments", verifyToken, isDoctor, doctorController.getAllDoctorAppointments);
+router.get(
+  "/appointments",
+  verifyToken,
+  isDoctor,
+  doctorController.getAllDoctorAppointments
+);
 
 router.get(
   "/session-request/get",
@@ -75,5 +80,12 @@ router.get(
   verifyToken,
   isDoctor,
   doctorController.getDoctorSessionStats
+);
+
+router.post(
+  "/completed-appointments",
+  verifyToken,
+  isDoctor,
+  doctorController.completeAppointment
 );
 module.exports = router;
