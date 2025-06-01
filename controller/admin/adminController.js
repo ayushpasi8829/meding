@@ -6,7 +6,7 @@ const sendMessage = require("../../utils/sendMessage");
 const Appointment = require("../../models/Appointment");
 const moment = require("moment");
 const ExcelJS = require("exceljs");
-const Notification = require('../../models/Notification');
+const Notification = require("../../models/Notification");
 
 //doctor------
 exports.createDoctor = async (req, res) => {
@@ -35,13 +35,17 @@ exports.createDoctor = async (req, res) => {
     !availability.startTime ||
     !availability.endTime
   ) {
-    return res.status(400).json({ success: false, message: "All fields are required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "All fields are required" });
   }
 
   try {
     let doctor = await User.findOne({ email, role: "doctor" });
     if (doctor) {
-      return res.status(400).json({ success: false, message: "Doctor already exists" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Doctor already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -121,7 +125,6 @@ exports.getDoctors = async (req, res) => {
   }
 };
 
-
 exports.updateDoctor = async (req, res) => {
   const { id } = req.params;
   const {
@@ -139,7 +142,9 @@ exports.updateDoctor = async (req, res) => {
     const doctor = await User.findById(id);
 
     if (!doctor || doctor.role !== "doctor") {
-      return res.status(404).json({ success: false, message: "Doctor not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Doctor not found" });
     }
 
     doctor.fullname = fullname || doctor.fullname;
@@ -170,17 +175,20 @@ exports.deleteDoctor = async (req, res) => {
     const doctor = await User.findById(id);
 
     if (!doctor || doctor.role !== "doctor") {
-      return res.status(404).json({ success: false, message: "Doctor not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Doctor not found" });
     }
 
     await User.findByIdAndDelete(id);
 
-    res.status(200).json({ success: true, message: "Doctor deleted successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "Doctor deleted successfully" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 //users------
 exports.userList = async (req, res) => {
@@ -237,13 +245,17 @@ exports.createUser = async (req, res) => {
   const { fullname, email, mobile, location, reason } = req.body;
 
   if (!fullname || !email || !mobile || !location || !reason) {
-    return res.status(400).json({ success: false, message: "All fields are required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "All fields are required" });
   }
 
   try {
     const existingUser = await User.findOne({ mobile });
     if (existingUser) {
-      return res.status(409).json({ success: false, message: "User already exists" });
+      return res
+        .status(409)
+        .json({ success: false, message: "User already exists" });
     }
 
     const referralCode = generateReferralCode(fullname);
@@ -261,7 +273,11 @@ exports.createUser = async (req, res) => {
 
     await user.save();
 
-    res.status(201).json({ success: true, message: "User created successfully", data: user });
+    res.status(201).json({
+      success: true,
+      message: "User created successfully",
+      data: user,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -272,12 +288,17 @@ exports.updateUser = async (req, res) => {
   const { fullname, email, mobile, location, reason } = req.body;
 
   if (!fullname || !email || !mobile || !location || !reason) {
-    return res.status(400).json({ success: false, message: "All fields are required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "All fields are required" });
   }
 
   try {
     const user = await User.findById(id);
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
 
     user.fullname = fullname;
     user.email = email;
@@ -287,7 +308,11 @@ exports.updateUser = async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ success: true, message: "User updated successfully", data: user });
+    res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      data: user,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -298,14 +323,18 @@ exports.deleteUser = async (req, res) => {
 
   try {
     const user = await User.findByIdAndDelete(id);
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    if (!user)
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
 
-    res.status(200).json({ success: true, message: "User deleted successfully" });
+    res
+      .status(200)
+      .json({ success: true, message: "User deleted successfully" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 exports.SessionStats = async (req, res) => {
   const doctorId = req.user?.id;
@@ -314,15 +343,26 @@ exports.SessionStats = async (req, res) => {
     const todayStart = moment().startOf("day").toDate();
     const todayEnd = moment().endOf("day").toDate();
 
-    const totalSessions = await Appointment.countDocuments({ doctor: doctorId });
-    const completedSessions = await Appointment.countDocuments({ doctor: doctorId, status: 'completed' });
-    const cancelledSessions = await Appointment.countDocuments({ doctor: doctorId, status: 'cancelled' });
-    const scheduledSessions = await Appointment.countDocuments({ doctor: doctorId, status: 'scheduled' });
+    const totalSessions = await Appointment.countDocuments({
+      doctor: doctorId,
+    });
+    const completedSessions = await Appointment.countDocuments({
+      doctor: doctorId,
+      status: "completed",
+    });
+    const cancelledSessions = await Appointment.countDocuments({
+      doctor: doctorId,
+      status: "cancelled",
+    });
+    const scheduledSessions = await Appointment.countDocuments({
+      doctor: doctorId,
+      status: "scheduled",
+    });
 
     const todaySessions = await Appointment.countDocuments({
       doctor: doctorId,
       date: { $gte: todayStart, $lte: todayEnd },
-      status: { $ne: 'cancelled' } 
+      status: { $ne: "cancelled" },
     });
 
     res.status(200).json({
@@ -436,7 +476,7 @@ exports.getAdminNotifications = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const notifications = await Notification.find(filter)
-      .populate('user', 'name email') 
+      .populate("user", "name email")
       .sort({ sentAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -444,40 +484,46 @@ exports.getAdminNotifications = async (req, res) => {
     const total = await Notification.countDocuments(filter);
 
     // Excel Export
-    if (exportExcel === 'true') {
-      const dataForExcel = notifications.map(n => ({
-        User: n.user?.name || '',
-        Email: n.user?.email || '',
+    if (exportExcel === "true") {
+      const dataForExcel = notifications.map((n) => ({
+        User: n.user?.name || "",
+        Email: n.user?.email || "",
         Recipient: n.recipient,
         Message: n.message,
         Type: n.type,
         Status: n.status,
-        SentAt: n.sentAt ? new Date(n.sentAt).toLocaleString() : '',
-        Error: n.error || '',
+        SentAt: n.sentAt ? new Date(n.sentAt).toLocaleString() : "",
+        Error: n.error || "",
       }));
 
       const ws = XLSX.utils.json_to_sheet(dataForExcel);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Notifications');
+      XLSX.utils.book_append_sheet(wb, ws, "Notifications");
 
-      const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+      const buffer = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
 
-      res.setHeader('Content-Disposition', 'attachment; filename="notifications.xlsx"');
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="notifications.xlsx"'
+      );
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
       return res.send(buffer);
     }
 
     res.status(200).json({
       success: true,
-      message: 'Notifications fetched successfully',
+      message: "Notifications fetched successfully",
       data: notifications,
       total,
       currentPage: parseInt(page),
       totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
-    console.error('Error fetching notifications:', error.message);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error("Error fetching notifications:", error.message);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -487,7 +533,9 @@ exports.createBundleType = async (req, res) => {
     const { name, sessionCount, price } = req.body;
 
     if (!name || !sessionCount || !price) {
-      return res.status(400).json({ success: false, message: "All fields are required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "All fields are required" });
     }
 
     const bundleType = await BundleType.create({ name, sessionCount, price });
@@ -525,7 +573,9 @@ exports.getBundleTypeById = async (req, res) => {
     const bundle = await BundleType.findById(id);
 
     if (!bundle) {
-      return res.status(404).json({ success: false, message: "Bundle type not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Bundle type not found" });
     }
 
     res.status(200).json({
@@ -552,7 +602,9 @@ exports.updateBundleType = async (req, res) => {
     );
 
     if (!updated) {
-      return res.status(404).json({ success: false, message: "Bundle type not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Bundle type not found" });
     }
 
     res.status(200).json({
@@ -574,7 +626,9 @@ exports.deleteBundleType = async (req, res) => {
     const deleted = await BundleType.findByIdAndDelete(id);
 
     if (!deleted) {
-      return res.status(404).json({ success: false, message: "Bundle type not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Bundle type not found" });
     }
 
     res.status(200).json({
@@ -587,25 +641,30 @@ exports.deleteBundleType = async (req, res) => {
   }
 };
 
-
 exports.makeUserAdmin = async (req, res) => {
   try {
     const { userId } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ success: false, message: 'User ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: "User ID is required" });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
-    if (user.role === 'admin') {
-      return res.status(400).json({ success: false, message: 'User is already an admin' });
+    if (user.role === "admin") {
+      return res
+        .status(400)
+        .json({ success: false, message: "User is already an admin" });
     }
 
-    user.role = 'admin';
+    user.role = "admin";
     await user.save();
 
     res.status(200).json({
@@ -614,15 +673,13 @@ exports.makeUserAdmin = async (req, res) => {
       data: user,
     });
   } catch (error) {
-    console.error('Error making user admin:', error.message);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error("Error making user admin:", error.message);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-
 exports.sendWhatsAppMessage = async (req, res) => {
-    const { phone, message, email } = req.body;  
-    const response = await sendMessage(phone, message, email);
-    res.status(response.success ? 200 : 500).json(response);
-  };
-
+  const { phone, message, email } = req.body;
+  const response = await sendMessage(phone, message, email);
+  res.status(response.success ? 200 : 500).json(response);
+};

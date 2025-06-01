@@ -85,4 +85,75 @@ router.post(
   verifyToken,
   communityInitiativeController.registerForSession
 );
+
+//Admin routes
+router.get(
+  "/get-volunteers",
+  verifyToken,
+  isAdmin,
+  communityInitiativeController.getAllVolunteers
+);
+
+router.get(
+  "/get-All-Org-Camps-requests",
+  verifyToken,
+  isAdmin,
+  communityInitiativeController.getAllOrgCampRequests
+);
+
+router.get(
+  "/get-all-therapyplus-requests",
+  verifyToken,
+  isAdmin,
+  communityInitiativeController.getAllTherapyPlusJoins
+);
+
+router.get(
+  "/get-all-therapyplus-hosts",
+  verifyToken,
+  isAdmin,
+  communityInitiativeController.getAllTherapyPlusHosts
+);
+
+router.get(
+  "/get-all-counselorclub-sessions",
+  verifyToken,
+  isAdmin,
+  communityInitiativeController.getAllSessions
+);
+
+router.get(
+  "/get-couselclub-registration",
+  verifyToken,
+  isAdmin,
+  communityInitiativeController.getAllRegistrations
+);
+
+router.get(
+  "/get-all-couselorclubhost-proposals",
+  verifyToken,
+  isAdmin,
+  communityInitiativeController.getAllProposals
+);
+
+router.get(
+  "/get-not-sure-requests",
+  verifyToken,
+  isAdmin,
+  communityInitiativeController.getAllNotSureBookings
+);
+
+router.get(
+  "/get-grouptherapy-sessions",
+  verifyToken,
+  isAdmin,
+  communityInitiativeController.getAllGroupTherapySessions
+);
+
+router.get(
+  "/get-grouptherapy-registrations",
+  verifyToken,
+  isAdmin,
+  communityInitiativeController.getAllGroupTherapyRegistrations
+);
 module.exports = router;

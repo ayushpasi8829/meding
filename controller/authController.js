@@ -49,7 +49,6 @@ exports.sendOtp = async (req, res) => {
   }
 };
 
-
 exports.verifyOtp = async (req, res) => {
   const { email, otp } = req.body;
 
@@ -64,7 +63,9 @@ exports.verifyOtp = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user || user.otp !== otp || user.otpExpiresAt < new Date()) {
-      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or expired OTP" });
     }
 
     user.isEmailVerified = true;
@@ -89,7 +90,6 @@ exports.verifyOtp = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 const generateReferralCode = (name) => {
   const prefix = name.split(" ")[0].substring(0, 3).toUpperCase();
@@ -156,7 +156,6 @@ exports.register = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 exports.doctorSignup = async (req, res) => {
   try {
@@ -275,9 +274,7 @@ exports.login = async (req, res) => {
         .json({ success: false, message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, "SECRET_KEY", {
-      expiresIn: "1h",
-    });
+    const token = jwt.sign({ id: user._id, role: user.role }, "SECRET_KEY");
     res.json({
       success: true,
       message: "Login successful",

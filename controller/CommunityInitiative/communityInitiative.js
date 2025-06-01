@@ -11,6 +11,7 @@ const NotSure = require("../../models/NotSure");
 const GroupTherapySession = require("../../models/GroupTherapySession");
 const GroupTherapyRegistration = require("../../models/GroupTherapyRegistration");
 const mongoose = require("mongoose");
+
 const createVolunteer = async (req, res) => {
   try {
     const { name, age, city, college, education, why } = req.body;
@@ -438,6 +439,460 @@ const registerForSession = async (req, res) => {
       .json({ error: "Registration failed.", details: err.message });
   }
 };
+
+//get Apis
+const paginateResults = (query, page = 1, limit = 10) => {
+  const skip = (page - 1) * limit;
+  return query.skip(skip).limit(parseInt(limit));
+};
+
+/**
+ * Utility function for error responses
+ * @param {Object} res - Express response object
+ * @param {Number} statusCode - HTTP status code
+ * @param {String} message - Error message
+ * @param {Object} error - Error object
+ */
+const errorResponse = (res, statusCode, message, error) => {
+  return res.status(statusCode).json({
+    success: false,
+    message,
+    error: error.message,
+  });
+};
+
+const getAllVolunteers = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, name, city, college } = req.query;
+
+    let query = Volunteer.find();
+
+    // Apply filters if provided
+    if (name) query = query.where("name", new RegExp(name, "i"));
+    if (city) query = query.where("city", new RegExp(city, "i"));
+    if (college) query = query.where("college", new RegExp(college, "i"));
+
+    // Get total count for pagination
+    const total = await Volunteer.countDocuments(query);
+
+    // Execute query with pagination
+    const volunteers = await paginateResults(query, page, limit)
+      .populate("user", "email")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: volunteers,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    errorResponse(res, 500, "Failed to retrieve volunteers", error);
+  }
+};
+
+const getAllOrgCampRequests = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, orgName, city, status } = req.query;
+
+    let query = OrgCampRequest.find();
+
+    // Apply filters if provided
+    if (orgName) query = query.where("orgName", new RegExp(orgName, "i"));
+    if (city) query = query.where("city", new RegExp(city, "i"));
+    if (status) query = query.where("status", status);
+
+    // Get total count for pagination
+    const total = await OrgCampRequest.countDocuments(query);
+
+    // Execute query with pagination
+    const campRequests = await paginateResults(query, page, limit)
+      .populate("user", "email")
+      .sort({ date: 1 });
+
+    res.status(200).json({
+      success: true,
+      data: campRequests,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    errorResponse(res, 500, "Failed to retrieve camp requests", error);
+  }
+};
+
+const getAllTherapyPlusJoins = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, name, city, profession } = req.query;
+
+    let query = TherapyPlusJoin.find();
+
+    // Apply filters if provided
+    if (name) query = query.where("name", new RegExp(name, "i"));
+    if (city) query = query.where("city", new RegExp(city, "i"));
+    if (profession)
+      query = query.where("profession", new RegExp(profession, "i"));
+
+    // Get total count for pagination
+    const total = await TherapyPlusJoin.countDocuments(query);
+
+    // Execute query with pagination
+    const joins = await paginateResults(query, page, limit)
+      .populate("user", "email")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: joins,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    errorResponse(
+      res,
+      500,
+      "Failed to retrieve Therapy Plus join requests",
+      error
+    );
+  }
+};
+
+const getAllTherapyPlusHosts = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      name,
+      profession,
+      sessionType,
+      status,
+    } = req.query;
+
+    let query = TherapyPlusHost.find();
+
+    // Apply filters if provided
+    if (name) query = query.where("name", new RegExp(name, "i"));
+    if (profession)
+      query = query.where("profession", new RegExp(profession, "i"));
+    if (sessionType)
+      query = query.where("sessionType", new RegExp(sessionType, "i"));
+    if (status) query = query.where("status", status);
+
+    // Get total count for pagination
+    const total = await TherapyPlusHost.countDocuments(query);
+
+    // Execute query with pagination
+    const hosts = await paginateResults(query, page, limit)
+      .populate("user", "email")
+      .sort({ preferredDate: 1 });
+
+    res.status(200).json({
+      success: true,
+      data: hosts,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    errorResponse(
+      res,
+      500,
+      "Failed to retrieve Therapy Plus host proposals",
+      error
+    );
+  }
+};
+
+const getAllSessions = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      title,
+      speaker,
+      mode,
+      upcoming,
+      past,
+      active,
+    } = req.query;
+
+    let query = Session.find();
+
+    // Apply filters if provided
+    if (title) query = query.where("title", new RegExp(title, "i"));
+    if (speaker) query = query.where("speaker", new RegExp(speaker, "i"));
+    if (mode) query = query.where("mode", new RegExp(mode, "i"));
+
+    // Filter by upcoming or past sessions
+    const now = new Date();
+    if (upcoming === "true") {
+      query = query.where("dateTime").gte(now);
+    } else if (past === "true") {
+      query = query.where("dateTime").lt(now);
+    }
+
+    // Filter by active status
+    if (active === "true") {
+      query = query.where("active", true);
+    } else if (active === "false") {
+      query = query.where("active", false);
+    }
+
+    // Get total count for pagination
+    const total = await Session.countDocuments(query);
+
+    // Execute query with pagination
+    const sessions = await paginateResults(query, page, limit)
+      .populate("createdBy", "email")
+      .sort({ dateTime: 1 });
+
+    res.status(200).json({
+      success: true,
+      data: sessions,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    errorResponse(res, 500, "Failed to retrieve sessions", error);
+  }
+};
+
+const getAllRegistrations = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      name,
+      email,
+      profession,
+      sessionId,
+    } = req.query;
+
+    let query = Registration.find();
+
+    // Apply filters if provided
+    if (name) query = query.where("name", new RegExp(name, "i"));
+    if (email) query = query.where("email", new RegExp(email, "i"));
+    if (profession)
+      query = query.where("profession", new RegExp(profession, "i"));
+    if (sessionId && mongoose.Types.ObjectId.isValid(sessionId)) {
+      query = query.where("session", sessionId);
+    }
+
+    // Get total count for pagination
+    const total = await Registration.countDocuments(query);
+
+    // Execute query with pagination
+    const registrations = await paginateResults(query, page, limit)
+      .populate("session", "title dateTime")
+      .populate("user", "email")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: registrations,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    errorResponse(res, 500, "Failed to retrieve registrations", error);
+  }
+};
+
+const getAllProposals = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, name, email, topic, status } = req.query;
+
+    let query = Proposal.find();
+
+    // Apply filters if provided
+    if (name) query = query.where("name", new RegExp(name, "i"));
+    if (email) query = query.where("email", new RegExp(email, "i"));
+    if (topic) query = query.where("topic", new RegExp(topic, "i"));
+    if (status) query = query.where("status", status);
+
+    // Get total count for pagination
+    const total = await Proposal.countDocuments(query);
+
+    // Execute query with pagination
+    const proposals = await paginateResults(query, page, limit)
+      .populate("user", "email")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: proposals,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    errorResponse(res, 500, "Failed to retrieve proposals", error);
+  }
+};
+const getAllNotSureBookings = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, date, upcoming } = req.query;
+
+    let query = NotSure.find();
+
+    // Apply filters if provided
+    if (date) query = query.where("date", date);
+
+    // Filter by upcoming bookings
+    const now = new Date();
+    if (upcoming === "true") {
+      query = query.where("date").gte(now);
+    }
+
+    // Get total count for pagination
+    const total = await NotSure.countDocuments(query);
+
+    // Execute query with pagination
+    const bookings = await paginateResults(query, page, limit)
+      .populate("user", "email name")
+      .sort({ date: 1, timeSlot: 1 });
+
+    res.status(200).json({
+      success: true,
+      data: bookings,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    errorResponse(res, 500, "Failed to retrieve NotSure bookings", error);
+  }
+};
+
+const getAllGroupTherapySessions = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      title,
+      therapist,
+      upcoming,
+      past,
+    } = req.query;
+
+    let query = GroupTherapySession.find();
+
+    // Apply filters if provided
+    if (title) query = query.where("title", new RegExp(title, "i"));
+    if (therapist) query = query.where("therapist", new RegExp(therapist, "i"));
+
+    // Filter by upcoming or past sessions
+    const now = new Date();
+    if (upcoming === "true") {
+      query = query.where("date").gte(now);
+    } else if (past === "true") {
+      query = query.where("date").lt(now);
+    }
+
+    // Get total count for pagination
+    const total = await GroupTherapySession.countDocuments(query);
+
+    // Execute query with pagination
+    const sessions = await paginateResults(query, page, limit).sort({
+      date: 1,
+      time: 1,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: sessions,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    errorResponse(res, 500, "Failed to retrieve group therapy sessions", error);
+  }
+};
+
+const getAllGroupTherapyRegistrations = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      name,
+      email,
+      profession,
+      sessionId,
+    } = req.query;
+
+    let query = GroupTherapyRegistration.find();
+
+    // Apply filters if provided
+    if (name) query = query.where("name", new RegExp(name, "i"));
+    if (email) query = query.where("email", new RegExp(email, "i"));
+    if (profession)
+      query = query.where("profession", new RegExp(profession, "i"));
+    if (sessionId && mongoose.Types.ObjectId.isValid(sessionId)) {
+      query = query.where("session", sessionId);
+    }
+
+    // Get total count for pagination
+    const total = await GroupTherapyRegistration.countDocuments(query);
+
+    // Execute query with pagination
+    const registrations = await paginateResults(query, page, limit)
+      .populate("session", "title date time")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: registrations,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    errorResponse(
+      res,
+      500,
+      "Failed to retrieve group therapy registrations",
+      error
+    );
+  }
+};
+
 module.exports = {
   createVolunteer,
   createOrgCampRequest,
@@ -451,4 +906,16 @@ module.exports = {
   createGrouptherapySession,
   getCurrentSession,
   registerForSession,
+  //get apis admin
+  getAllVolunteers,
+  getAllOrgCampRequests,
+  getAllTherapyPlusJoins,
+  getAllTherapyPlusHosts,
+  getAllSessions,
+
+  getAllRegistrations,
+  getAllProposals,
+  getAllNotSureBookings,
+  getAllGroupTherapySessions,
+  getAllGroupTherapyRegistrations,
 };
