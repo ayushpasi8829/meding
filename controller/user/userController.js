@@ -392,12 +392,16 @@ exports.getSessionSummary = async (req, res) => {
   try {
     const userId = req.user?.id;
     const now = new Date();
-    console.log(userId)
+    console.log(userId);
     const allAppointments = await Appointment.find({ patient: userId });
     console.log(allAppointments);
-    const upcoming = allAppointments.filter(app => app.date > now &&  app.status === "scheduled");
-    const completed = allAppointments.filter(app => app.status === "completed");
-    const cancelled = allAppointments.filter(app =>
+    const upcoming = allAppointments.filter(
+      (app) => app.date > now && app.status === "scheduled"
+    );
+    const completed = allAppointments.filter(
+      (app) => app.status === "completed"
+    );
+    const cancelled = allAppointments.filter((app) =>
       ["cancelled", "no-show"].includes(app.status)
     );
 
@@ -422,16 +426,19 @@ exports.getTodaySession = async (req, res) => {
     const todaySession = await Appointment.findOne({
       patient: userId,
       date: { $gte: todayStart, $lte: todayEnd },
-      status: "scheduled"
+      status: "scheduled",
     }).populate("doctor", "name email");
 
     if (!todaySession) {
-      return res.json({ hasSessionToday: false, message: "No session scheduled for today" });
+      return res.json({
+        hasSessionToday: false,
+        message: "No session scheduled for today",
+      });
     }
 
     return res.json({
       hasSessionToday: true,
-      session: todaySession
+      session: todaySession,
     });
   } catch (err) {
     console.error("Error checking today's session:", err);
@@ -453,7 +460,7 @@ exports.userSessions = async (req, res) => {
 
     return res.json({
       hasSession: true,
-      session: todaySession
+      session: todaySession,
     });
   } catch (err) {
     console.error("Error checking today's session:", err);
@@ -469,19 +476,21 @@ exports.getUpcomingSession = async (req, res) => {
     const upcomingSession = await Appointment.findOne({
       patient: userId,
       date: { $gt: now },
-      status: "scheduled"
+      status: "scheduled",
     })
-    .sort({ date: 1 })
-    .populate("doctor", "name email");
+      .sort({ date: 1 })
+      .populate("doctor", "name email");
 
     if (!upcomingSession) {
-      return res.json({ hasUpcomingSession: false, message: "No upcoming sessions" });
+      return res.json({
+        hasUpcomingSession: false,
+        message: "No upcoming sessions",
+      });
     }
 
     return res.json({
       hasUpcomingSession: true,
-      session:upcomingSession
-    
+      session: upcomingSession,
     });
   } catch (err) {
     console.error("Error checking upcoming session:", err);
@@ -493,10 +502,16 @@ exports.getTherapyPlan = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const bundle = await BundleSession.findOne({ user: userId, isActive: true });
+    const bundle = await BundleSession.findOne({
+      user: userId,
+      isActive: true,
+    });
 
     if (!bundle) {
-      return res.json({ hasActivePlan: false, message: "No active therapy bundle found." });
+      return res.json({
+        hasActivePlan: false,
+        message: "No active therapy bundle found.",
+      });
     }
 
     const { bundleType, totalSessions, usedSessions, paymentPlan } = bundle;
@@ -505,7 +520,9 @@ exports.getTherapyPlan = async (req, res) => {
     const dueAmount = totalAmount - paidAmount;
 
     // Find next unpaid installment (if any)
-    const nextInstallment = installments.find(inst => inst.status === "pending");
+    const nextInstallment = installments.find(
+      (inst) => inst.status === "pending"
+    );
 
     return res.json({
       hasActivePlan: true,
@@ -537,21 +554,114 @@ exports.getTherapyNotes = async (req, res) => {
 
     const appointments = await Appointment.find({
       patient: userId,
-      notes: { $exists: true, $ne: "" }
-     
+      notes: { $exists: true, $ne: "" },
     })
-      .populate("doctor", "fullname") 
-      .sort({ date: -1 }); 
+      .populate("doctor", "fullname")
+      .sort({ date: -1 });
 
-    const notes = appointments.map(appointment => ({
+    const notes = appointments.map((appointment) => ({
       date: appointment.date,
       doctorName: appointment.doctor?.fullname || "Unknown",
-      therapyNotes: appointment.notes
+      therapyNotes: appointment.notes,
     }));
 
     return res.json({ notes });
   } catch (error) {
     console.error("Error fetching therapy notes:", error);
     return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+exports.getUserProfile = async (req, res) => {
+  try {
+    // Assuming user ID is set in req.user._id by authentication middleware
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res
+        .status(401)
+        .json({ message: "Unauthorized: No user ID found." });
+    }
+
+    // Fetch only specified fields
+    const user = await User.findById(userId)
+      .select("fullname email mobile gender")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while fetching the user profile.",
+    });
+  }
+};
+
+exports.updateUserProfile = async (req, res) => {
+  try {
+    // Retrieve user ID from the authenticated request
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res
+        .status(401)
+        .json({ message: "Unauthorized: No user ID found." });
+    }
+
+    // Destructure and collect only allowed fields from the request body
+    const { fullname, email, mobile, gender } = req.body;
+    const updateData = {};
+
+    if (fullname !== undefined) updateData.fullname = fullname;
+    if (email !== undefined) updateData.email = email;
+    if (mobile !== undefined) updateData.mobile = mobile;
+    if (gender !== undefined) updateData.gender = gender;
+
+    if (Object.keys(updateData).length === 0) {
+      return res
+        .status(400)
+        .json({ message: "No valid fields provided for update." });
+    }
+
+    // Update the user document and return the new (updated) document
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true, runValidators: true } // Return updated doc, enforce schema validation
+    )
+      .select("fullname email mobile gender")
+      .lean();
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: updatedUser,
+    });
+  } catch (error) {
+    // Handle duplicate key errors (unique email/mobile)
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({
+        success: false,
+        message: `The ${field} provided is already in use.`,
+      });
+    }
+
+    console.error("Error updating user profile:", error);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while updating the user profile.",
+    });
   }
 };

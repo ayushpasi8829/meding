@@ -93,7 +93,7 @@ exports.acceptSessionRequest = async (req, res) => {
     ).toLocaleString()} - ${new Date(session.endTime).toLocaleString()}`;
 
     // Send message (WhatsApp/SMS + Email)
-    await sendMessage(fullPhone, message, user.email);
+    await sendMessage(fullPhone, message, user.email, user._id);
 
     res.status(200).json({
       success: true,
@@ -155,7 +155,7 @@ exports.cancelAppointment = async (req, res) => {
       ).toLocaleDateString()} at ${
         session.timeSlot.startTime
       } has been cancelled by the doctor.`;
-      await sendMessage(fullPhone, message, patient.email);
+      await sendMessage(fullPhone, message, patient.email, patient._id);
     }
 
     return res.status(200).json({
@@ -212,7 +212,7 @@ exports.completeAppointment = async (req, res) => {
       ).toLocaleDateString()} at ${
         session.timeSlot.startTime
       } has been cancelled by the doctor.`;
-      await sendMessage(fullPhone, message, patient.email);
+      await sendMessage(fullPhone, message, patient.email, patient._id);
     }
 
     return res.status(200).json({
@@ -289,7 +289,7 @@ exports.getTodayAppointments = async (req, res) => {
     const appointments = await Appointment.find({
       doctor: doctorId,
       date: { $gte: todayStart, $lte: todayEnd },
-      status: "scheduled",
+      status: { $in: ["scheduled", "completed", "cancelled"] },
     })
       .populate("patient", "fullname email")
       .sort({ date: 1 });
@@ -399,7 +399,7 @@ cron.schedule("*/5 * * * *", async () => {
       const fullPhone = `${patient.countryCode}${patient.mobile}`;
       const message = `Hi ${patient.fullname}, this is a reminder that your session is scheduled in 30 minutes.\nMeeting Link: ${session.meetLink}`;
 
-      await sendMessage(fullPhone, message, patient.email);
+      await sendMessage(fullPhone, message, patient.email, patient._id);
 
       session.reminderSent = true;
       await session.save();

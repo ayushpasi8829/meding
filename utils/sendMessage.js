@@ -1,7 +1,7 @@
 require("dotenv").config();
 const twilio = require("twilio");
 const nodemailer = require("nodemailer");
-
+const Notification = require('../models/Notification'); 
 
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
@@ -20,7 +20,12 @@ const transporter = nodemailer.createTransport({
  * @param {string} email - Recipient's email address
  * @returns {Object} Response with success status and details
  */
-const sendMessage = async (phone, message, email) => {
+const sendMessage = async (phone, message, email, userId = null) => {
+  let status = 'sent';
+  let error = null;
+  let whatsappSID = null;
+  let emailMessageId = null;
+
   try {
     if (!phone || !message || !email) {
       throw new Error("Phone number, message, and email are required");
@@ -34,8 +39,8 @@ const sendMessage = async (phone, message, email) => {
       to: `whatsapp:${formattedPhone}`,
       body: message,
     });
-
-    console.log("WhatsApp Message SID:", whatsappResponse.sid);
+    whatsappSID = whatsappResponse.sid;
+    console.log("WhatsApp Message SID:", whatsappSID);
 
     // Send Email
     const mailOptions = {
@@ -46,20 +51,41 @@ const sendMessage = async (phone, message, email) => {
     };
 
     const emailResponse = await transporter.sendMail(mailOptions);
-    console.log("Email Sent:", emailResponse.messageId);
-
-    return {
-      success: true,
-      message: "Message sent successfully via WhatsApp and Email",
-      data: {
-        whatsappSID: whatsappResponse.sid,
-        emailMessageId: emailResponse.messageId,
-      },
-    };
-  } catch (error) {
-    console.error("Error sending message:", error.message);
-    return { success: false, message: error.message };
+    emailMessageId = emailResponse.messageId;
+    console.log("Email Sent:", emailMessageId);
+  } catch (err) {
+    status = 'failed';
+    error = err.message || 'Unknown error';
+    console.error("Error sending message:", error);
   }
+
+  // Log notification
+  try {
+    await Notification.create({
+      user: userId,
+      type: 'both',
+      recipient: `${phone} / ${email}`,
+      message,
+      status,
+      error,
+      sentAt: new Date(),
+    });
+  } catch (logErr) {
+    console.error("Failed to log notification:", logErr.message);
+  }
+
+  return {
+    success: status === 'sent',
+    message: status === 'sent'
+      ? "Message sent successfully via WhatsApp and Email"
+      : "Failed to send message",
+    data: {
+      whatsappSID,
+      emailMessageId,
+      status,
+      error,
+    },
+  };
 };
 
 module.exports = sendMessage;

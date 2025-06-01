@@ -1,28 +1,27 @@
 const User = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const sendEmail = require("../utils/sendEmail");
 
 exports.sendOtp = async (req, res) => {
-  const { mobile, countryCode } = req.body;
+  const { email } = req.body;
 
-  if (!mobile || !countryCode) {
+  if (!email) {
     return res.status(400).json({
       success: false,
-      message: "Mobile and country code are required",
+      message: "Email is required",
     });
   }
 
-  // const otp = Math.floor(100000 + Math.random() * 900000).toString(); // generate random OTP
-  const otp = 123456;
+  const otp = 123456; // Change to random in production
   const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
 
   try {
-    let user = await User.findOne({ mobile });
+    let user = await User.findOne({ email });
 
     if (!user) {
       user = new User({
-        mobile,
-        countryCode,
+        email,
         role: "user",
         otp,
         otpExpiresAt,
@@ -34,15 +33,15 @@ exports.sendOtp = async (req, res) => {
 
     await user.save();
 
-    // Send OTP via SMS here (e.g., using Twilio or any other service)
-    // await sendOtpToMobile(countryCode + mobile, otp);
+    // Send OTP via email
+    await sendEmail(email, "Your OTP Code", `Your OTP is ${otp}`);
 
     res.status(200).json({
       success: true,
-      message: "OTP sent successfully",
+      message: "OTP sent successfully to email",
       data: {
-        mobile: user.mobile,
-        otp, // Only for testing – remove in production!
+        email: user.email,
+        otp, // Remove in production
       },
     });
   } catch (err) {
@@ -50,25 +49,25 @@ exports.sendOtp = async (req, res) => {
   }
 };
 
-exports.verifyOtp = async (req, res) => {
-  const { mobile, otp } = req.body;
 
-  if (!mobile || !otp) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Mobile and OTP are required" });
+exports.verifyOtp = async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and OTP are required",
+    });
   }
 
   try {
-    const user = await User.findOne({ mobile });
+    const user = await User.findOne({ email });
 
     if (!user || user.otp !== otp || user.otpExpiresAt < new Date()) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid or expired OTP" });
+      return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
     }
 
-    user.isMobileVerified = true;
+    user.isEmailVerified = true;
     user.otp = undefined;
     user.otpExpiresAt = undefined;
     await user.save();
@@ -80,9 +79,9 @@ exports.verifyOtp = async (req, res) => {
       message: "OTP verified successfully",
       data: {
         id: user._id,
-        mobile: user.mobile,
+        email: user.email,
         token,
-        isMobileVerified: user.isMobileVerified,
+        isEmailVerified: user.isEmailVerified,
       },
     });
   } catch (err) {
@@ -91,6 +90,7 @@ exports.verifyOtp = async (req, res) => {
   }
 };
 
+
 const generateReferralCode = (name) => {
   const prefix = name.split(" ")[0].substring(0, 3).toUpperCase();
   const random = Math.floor(1000 + Math.random() * 9000);
@@ -98,9 +98,9 @@ const generateReferralCode = (name) => {
 };
 
 exports.register = async (req, res) => {
-  const { fullname, email, mobile, location, reason } = req.body;
+  const { fullname, email, location, reason } = req.body;
 
-  if (!fullname || !email || !mobile || !location || !reason) {
+  if (!fullname || !email || !location || !reason) {
     return res.status(400).json({
       success: false,
       message: "All fields are required",
@@ -108,9 +108,8 @@ exports.register = async (req, res) => {
   }
 
   try {
-    let user = await User.findOne({ mobile });
+    let user = await User.findOne({ email });
 
-    // const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otp = 123456;
     const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
@@ -119,42 +118,37 @@ exports.register = async (req, res) => {
       user = new User({
         fullname,
         email,
-        mobile,
-
         location,
         reason,
-        isMobileVerified: false,
+        isEmailVerified: false,
         otp,
         referralCode,
         otpExpiresAt,
         role: "user",
       });
     } else {
-      // Update OTP for existing but unverified users
       user.otp = otp;
       user.otpExpiresAt = otpExpiresAt;
-      // Optionally update other fields if you want to allow edits before verification
       user.fullname = fullname;
-      user.email = email;
       user.location = location;
       user.reason = reason;
     }
 
     await user.save();
 
-    // Send OTP via SMS here
+    // Send OTP via email
+    await sendEmail(email, "Your OTP Code", `Your OTP is ${otp}`);
 
     res.status(201).json({
       success: true,
-      message: "Registration successful. OTP sent to your mobile.",
+      message: "Registration successful. OTP sent to your email.",
       data: {
         fullname: user.fullname,
         email: user.email,
-        mobile: user.mobile,
         location: user.location,
-        otp: user.otp, // ⚠️ Remove or mask this in production!
+        otp: user.otp, // Remove in production
         otpExpiresAt: user.otpExpiresAt,
-        isMobileVerified: user.isMobileVerified,
+        isEmailVerified: user.isEmailVerified,
         role: user.role,
       },
     });
@@ -162,6 +156,7 @@ exports.register = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 exports.doctorSignup = async (req, res) => {
   try {

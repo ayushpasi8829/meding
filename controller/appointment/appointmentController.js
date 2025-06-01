@@ -286,7 +286,7 @@ const autoBookAppointment = async (req, res) => {
 
     const notificationMessage = `Hello ${patient.fullname}, your session with Dr. ${selectedDoctor.doctor.fullname} on ${date} from ${startTime} to ${endTime} has been scheduled successfully.`;
 
-    await sendMessage(fullPhone, notificationMessage, patient.email);
+    await sendMessage(fullPhone, notificationMessage, patient.email, patient._id);
 
     return res.status(201).json({
       message: "Appointment booked successfully.",

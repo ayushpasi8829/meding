@@ -44,6 +44,9 @@ const userSchema = new mongoose.Schema({
     sparse: true,
   },
   password: { type: String, required: false },
+  gender: {
+    type: String,
+  },
 });
 
 module.exports = mongoose.model("User", userSchema);
