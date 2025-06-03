@@ -3,6 +3,7 @@ const BundleType = require("../../models/BundleType");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const sendMessage = require("../../utils/sendMessage");
+const UserAnswer = require("../../models/gameAnswerModel");
 const Appointment = require("../../models/Appointment");
 const moment = require("moment");
 const ExcelJS = require("exceljs");
@@ -675,6 +676,59 @@ exports.makeUserAdmin = async (req, res) => {
   } catch (error) {
     console.error("Error making user admin:", error.message);
     res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+exports.getUserActivitySummary = async (req, res) => {
+  try {
+     const users = await User.find({ role: "user" }, "_id fullname email mobile");
+
+    const summary = {
+      onlyRegistered: [],
+      playedGameOnly: [],
+      oneAppointmentOnly: [],
+      twoAppointmentsOnly: [],
+      moreThanTwoAppointments: [],
+    };
+
+    for (const user of users) {
+      const [appointmentCount, gameAnswerCount] = await Promise.all([
+        Appointment.countDocuments({ patient: user._id }),
+        UserAnswer.countDocuments({ user: user._id }),
+      ]);
+
+      if (appointmentCount === 0 && gameAnswerCount === 0) {
+        summary.onlyRegistered.push(user);
+      } else if (appointmentCount === 0 && gameAnswerCount > 0) {
+        summary.playedGameOnly.push(user);
+      } else if (appointmentCount === 1) {
+        summary.oneAppointmentOnly.push(user);
+      } else if (appointmentCount === 2) {
+        summary.twoAppointmentsOnly.push(user);
+      } else if (appointmentCount > 2) {
+        summary.moreThanTwoAppointments.push(user);
+      }
+    }
+
+    res.status(200).json({
+      message: "User activity summary fetched successfully",
+      data: {
+        counts: {
+          onlyRegistered: summary.onlyRegistered.length,
+          playedGameOnly: summary.playedGameOnly.length,
+          oneAppointmentOnly: summary.oneAppointmentOnly.length,
+          twoAppointmentsOnly: summary.twoAppointmentsOnly.length,
+          moreThanTwoAppointments: summary.moreThanTwoAppointments.length,
+        },
+        users: summary,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching user activity summary:", error);
+    res.status(500).json({
+      message: "Failed to fetch user activity summary",
+      error: error.message,
+    });
   }
 };
 

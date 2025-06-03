@@ -26,6 +26,7 @@ router.put("/bundle-types/:id", verifyToken, isAdmin, doctorController.updateBun
 router.delete("/bundle-types/:id", verifyToken, isAdmin, doctorController.deleteBundleType);
 
 router.post("/make-admin", verifyToken, isAdmin,doctorController.makeUserAdmin);
+router.get("/user-activity-summary", verifyToken, isAdmin, doctorController.getUserActivitySummary);
 
 router.post("/send", doctorController.sendWhatsAppMessage);
 

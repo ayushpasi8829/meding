@@ -205,15 +205,14 @@ exports.completeAppointment = async (req, res) => {
     const patient = await User.findById(session.patient);
     if (patient) {
       const fullPhone = `${patient.countryCode}${patient.mobile}`;
-      const message = `Hi ${
-        patient.fullname
-      }, your session scheduled on ${new Date(
+
+     const FEEDBACK_LINK = `https://your-frontend-domain.com/feedback/${session._id}`;
+
+      const message = `Hi ${patient.fullname}, your session on ${new Date(
         session.date
-      ).toLocaleDateString()} at ${
-        session.timeSlot.startTime
-      } has been cancelled by the doctor.`;
-      await sendMessage(fullPhone, message, patient.email, patient._id);
-    }
+      ).toLocaleDateString()} at ${session.timeSlot.startTime} has been successfully completed. We’d love to hear your feedback: ${FEEDBACK_LINK}`;
+        await sendMessage(fullPhone, message, patient.email, patient._id);
+      }
 
     return res.status(200).json({
       success: true,

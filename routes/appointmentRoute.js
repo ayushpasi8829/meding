@@ -16,4 +16,6 @@ router.get("/get-Available-timeslots", appointmentController.getAvailableSlots);
 
 router.post("/book-appointment", verifyToken, isUser, appointmentController.autoBookAppointment);
 
+router.post("/feedback/:sessionId", verifyToken, isUser, appointmentController.submitFeedback);
+
 module.exports = router;
