@@ -81,6 +81,9 @@ exports.verifyOtp = async (req, res) => {
       data: {
         id: user._id,
         email: user.email,
+        fullname: user.fullname,
+        mobile: user.mobile,
+        location: user.location,
         token,
         isEmailVerified: user.isEmailVerified,
       },
