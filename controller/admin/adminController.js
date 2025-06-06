@@ -194,9 +194,9 @@ exports.deleteDoctor = async (req, res) => {
 //users------
 exports.userList = async (req, res) => {
   try {
-    const users = await User.find({ role: "user" });
+    const users = await User.find({ role: { $ne: "doctor" } });
 
-    // If `export=excel` is passed, generate and send Excel
+    // If export=excel is passed, generate and send Excel
     if (req.query.export === "excel") {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Users");
@@ -217,20 +217,18 @@ exports.userList = async (req, res) => {
         });
       });
 
+      const fileName = `users_${Date.now()}.xlsx`;
       res.setHeader(
         "Content-Type",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename=users_${Date.now()}.xlsx`
-      );
+      res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
 
       await workbook.xlsx.write(res);
       return res.end();
     }
 
-    // Normal JSON response
+    // Return JSON response if not exporting
     res.status(200).json({
       success: true,
       message: "User List Fetched Successfully",
@@ -647,12 +645,16 @@ exports.toggleUserRole = async (req, res) => {
     const { userId } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ success: false, message: "User ID is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "User ID is required" });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     // Toggle role
@@ -671,11 +673,12 @@ exports.toggleUserRole = async (req, res) => {
   }
 };
 
-
-
 exports.getUserActivitySummary = async (req, res) => {
   try {
-     const users = await User.find({ role: "user" }, "_id fullname email mobile");
+    const users = await User.find(
+      { role: "user" },
+      "_id fullname email mobile"
+    );
 
     const summary = {
       onlyRegistered: [],
@@ -726,13 +729,14 @@ exports.getUserActivitySummary = async (req, res) => {
   }
 };
 
-
 exports.addSlotTemplate = async (req, res) => {
   try {
     const { slots } = req.body;
 
     if (!Array.isArray(slots) || slots.length === 0) {
-      return res.status(400).json({ message: "At least one slot is required." });
+      return res
+        .status(400)
+        .json({ message: "At least one slot is required." });
     }
 
     for (const slot of slots) {
@@ -752,7 +756,7 @@ exports.addSlotTemplate = async (req, res) => {
     const createdSlots = await SlotTemplate.insertMany(
       slots.map((s) => ({
         startTime: s.startTime,
-        endTime: s.endTime
+        endTime: s.endTime,
       }))
     );
 

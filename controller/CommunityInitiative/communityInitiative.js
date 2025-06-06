@@ -895,7 +895,6 @@ const getAllGroupTherapyRegistrations = async (req, res) => {
   }
 };
 
-
 //events-------------------------------------------------
 
 const createEvent = async (req, res) => {
@@ -909,19 +908,25 @@ const createEvent = async (req, res) => {
       meetingLink,
       status,
       joiningFees,
-      'timeSlot.startTime': startTime,
-      'timeSlot.endTime': endTime,
+      "timeSlot.startTime": startTime,
+      "timeSlot.endTime": endTime,
     } = req.body;
 
     // Validation
     if (!type) {
-      return res.status(400).json({ success: false, message: "`type` is required." });
+      return res
+        .status(400)
+        .json({ success: false, message: "`type` is required." });
     }
     if (!startTime) {
-      return res.status(400).json({ success: false, message: "`timeSlot.startTime` is required." });
+      return res
+        .status(400)
+        .json({ success: false, message: "`timeSlot.startTime` is required." });
     }
     if (!endTime) {
-      return res.status(400).json({ success: false, message: "`timeSlot.endTime` is required." });
+      return res
+        .status(400)
+        .json({ success: false, message: "`timeSlot.endTime` is required." });
     }
 
     const eventData = {
@@ -945,13 +950,16 @@ const createEvent = async (req, res) => {
     }
 
     const event = await CommunityEvent.create(eventData);
-    res.status(201).json({ success: true, message: "Event created", data: event });
+    res
+      .status(201)
+      .json({ success: true, message: "Event created", data: event });
   } catch (error) {
     console.error("Create Event Error:", error);
-    res.status(500).json({ success: false, message: "Server Error", error: error.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Server Error", error: error.message });
   }
 };
-
 
 const getAllEvents = async (req, res) => {
   try {
@@ -961,7 +969,9 @@ const getAllEvents = async (req, res) => {
       filter.type = req.query.type;
     }
 
-    const events = await CommunityEvent.find(filter).populate("host", "fullname email");
+    const events = await CommunityEvent.find(filter)
+      .populate("host", "fullname email")
+      .populate("peopleJoined", "fullname email");
 
     res.status(200).json({ success: true, data: events });
   } catch (error) {
@@ -971,8 +981,14 @@ const getAllEvents = async (req, res) => {
 
 const getEventById = async (req, res) => {
   try {
-    const event = await CommunityEvent.findById(req.params.id).populate("host", "fullname email");
-    if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+    const event = await CommunityEvent.findById(req.params.id).populate(
+      "host",
+      "fullname email"
+    );
+    if (!event)
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
     res.status(200).json({ success: true, data: event });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server Error" });
@@ -991,19 +1007,25 @@ const updateEvent = async (req, res) => {
       meetingLink,
       status,
       joiningFees,
-      'timeSlot.startTime': startTime,
-      'timeSlot.endTime': endTime,
+      "timeSlot.startTime": startTime,
+      "timeSlot.endTime": endTime,
     } = req.body;
 
     // Validation
     if (!type) {
-      return res.status(400).json({ success: false, message: "`type` is required." });
+      return res
+        .status(400)
+        .json({ success: false, message: "`type` is required." });
     }
     if (!startTime) {
-      return res.status(400).json({ success: false, message: "`timeSlot.startTime` is required." });
+      return res
+        .status(400)
+        .json({ success: false, message: "`timeSlot.startTime` is required." });
     }
     if (!endTime) {
-      return res.status(400).json({ success: false, message: "`timeSlot.endTime` is required." });
+      return res
+        .status(400)
+        .json({ success: false, message: "`timeSlot.endTime` is required." });
     }
 
     const eventData = {
@@ -1021,34 +1043,41 @@ const updateEvent = async (req, res) => {
       },
     };
 
-   
     if (req.file) {
-      eventData.image = req.file.path; 
+      eventData.image = req.file.path;
     } else {
-   
       const existingEvent = await CommunityEvent.findById(id);
       if (!existingEvent) {
-        return res.status(404).json({ success: false, message: "Event not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Event not found" });
       }
       eventData.image = existingEvent.image;
     }
 
     const event = await CommunityEvent.findByIdAndUpdate(id, eventData, {
-      new: true, 
-      runValidators: true, 
+      new: true,
+      runValidators: true,
     });
 
-    res.status(200).json({ success: true, message: "Event updated", data: event });
+    res
+      .status(200)
+      .json({ success: true, message: "Event updated", data: event });
   } catch (error) {
     console.error("Update Event Error:", error);
-    res.status(500).json({ success: false, message: "Server Error", error: error.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Server Error", error: error.message });
   }
 };
 
 const deleteEvent = async (req, res) => {
   try {
     const event = await CommunityEvent.findByIdAndDelete(req.params.id);
-    if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+    if (!event)
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
 
     res.status(200).json({ success: true, message: "Event deleted" });
   } catch (error) {
@@ -1063,16 +1092,25 @@ const joinEvent = async (req, res) => {
 
     const event = await CommunityEvent.findById(eventId);
     if (!event) {
-      return res.status(404).json({ success: false, message: "Event not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
     }
 
     // Check if already joined
-    const alreadyJoined = await JoinEvent.findOne({ event: eventId, user: userId });
+    const alreadyJoined = await JoinEvent.findOne({
+      event: eventId,
+      user: userId,
+    });
     if (alreadyJoined) {
-      return res.status(400).json({ success: false, message: "You have already joined this event" });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "You have already joined this event",
+        });
     }
 
-    
     const joinRecord = new JoinEvent({
       event: eventId,
       user: userId,
@@ -1086,8 +1124,13 @@ const joinEvent = async (req, res) => {
     event.peopleJoined.push(userId);
     await event.save();
 
-    res.status(200).json({ success: true, message: "Event joined successfully", data: joinRecord });
-
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Event joined successfully",
+        data: joinRecord,
+      });
   } catch (error) {
     console.error("Join event error:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -1107,7 +1150,7 @@ module.exports = {
   createGrouptherapySession,
   getCurrentSession,
   registerForSession,
-  
+
   getAllVolunteers,
   getAllOrgCampRequests,
   getAllTherapyPlusJoins,
@@ -1120,6 +1163,10 @@ module.exports = {
   getAllGroupTherapySessions,
   getAllGroupTherapyRegistrations,
 
-
-  createEvent,getAllEvents,getEventById,updateEvent,deleteEvent, joinEvent
+  createEvent,
+  getAllEvents,
+  getEventById,
+  updateEvent,
+  deleteEvent,
+  joinEvent,
 };
