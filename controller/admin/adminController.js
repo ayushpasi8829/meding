@@ -194,7 +194,7 @@ exports.deleteDoctor = async (req, res) => {
 //users------
 exports.userList = async (req, res) => {
   try {
-    const users = await User.find({ role: "user" });
+    const users = await User.find({ role: {$ne : "doctor" } });
 
     // If `export=excel` is passed, generate and send Excel
     if (req.query.export === "excel") {
