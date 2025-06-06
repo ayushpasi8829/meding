@@ -101,9 +101,9 @@ const generateReferralCode = (name) => {
 };
 
 exports.register = async (req, res) => {
-  const { fullname, email, location, reason } = req.body;
+  const { fullname, email, location, reason, mobile } = req.body;
 
-  if (!fullname || !email || !location || !reason) {
+  if (!fullname || !email || !location || !reason || !mobile) {
     return res.status(400).json({
       success: false,
       message: "All fields are required",
@@ -113,14 +113,15 @@ exports.register = async (req, res) => {
   try {
     let user = await User.findOne({ email });
 
-    const otp = 123456;
-    const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    const otp = Math.floor(100000 + Math.random() * 900000); // Generates a random 6-digit OTP
+    const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
 
     if (!user) {
       const referralCode = generateReferralCode(fullname);
       user = new User({
         fullname,
         email,
+        mobile,
         location,
         reason,
         isEmailVerified: false,
@@ -149,7 +150,7 @@ exports.register = async (req, res) => {
         fullname: user.fullname,
         email: user.email,
         location: user.location,
-        otp: user.otp, // Remove in production
+        // otp: user.otp, // Don't send OTP in production
         otpExpiresAt: user.otpExpiresAt,
         isEmailVerified: user.isEmailVerified,
         role: user.role,
