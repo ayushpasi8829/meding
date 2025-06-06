@@ -10,6 +10,7 @@ const Proposal = require("../../models/Proposal");
 const NotSure = require("../../models/NotSure");
 const GroupTherapySession = require("../../models/GroupTherapySession");
 const GroupTherapyRegistration = require("../../models/GroupTherapyRegistration");
+const CommunityEvent = require("../../models/CommunityEvent");
 const mongoose = require("mongoose");
 
 const createVolunteer = async (req, res) => {
@@ -893,6 +894,68 @@ const getAllGroupTherapyRegistrations = async (req, res) => {
   }
 };
 
+
+//events-------------------------------------------------
+
+const createEvent = async (req, res) => {
+  try {
+    const eventData = { ...req.body, host: req.user.id };
+    if (req.file) {
+      eventData.image = req.file.path; // multer handles file upload
+    }
+    const event = await CommunityEvent.create(eventData);
+    res.status(201).json({ success: true, message: "Event created", data: event });
+  } catch (error) {
+    console.error("Create Event Error:", error);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+const getAllEvents = async (req, res) => {
+  try {
+    const events = await CommunityEvent.find().populate("host", "fullname email");
+    res.status(200).json({ success: true, data: events });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+const getEventById = async (req, res) => {
+  try {
+    const event = await CommunityEvent.findById(req.params.id).populate("host", "fullname email");
+    if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+    res.status(200).json({ success: true, data: event });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+const updateEvent = async (req, res) => {
+  try {
+    const updateData = req.body;
+    if (req.file) updateData.image = req.file.path;
+
+    const event = await CommunityEvent.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+
+    res.status(200).json({ success: true, message: "Event updated", data: event });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+const deleteEvent = async (req, res) => {
+  try {
+    const event = await CommunityEvent.findByIdAndDelete(req.params.id);
+    if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+
+    res.status(200).json({ success: true, message: "Event deleted" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+
 module.exports = {
   createVolunteer,
   createOrgCampRequest,
@@ -918,4 +981,7 @@ module.exports = {
   getAllNotSureBookings,
   getAllGroupTherapySessions,
   getAllGroupTherapyRegistrations,
+
+
+  createEvent,getAllEvents,getEventById,updateEvent,deleteEvent
 };

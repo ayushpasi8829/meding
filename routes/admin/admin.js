@@ -25,8 +25,11 @@ router.get("/bundle-types/:id", verifyToken, isAdmin, doctorController.getBundle
 router.put("/bundle-types/:id", verifyToken, isAdmin, doctorController.updateBundleType);
 router.delete("/bundle-types/:id", verifyToken, isAdmin, doctorController.deleteBundleType);
 
-router.post("/make-admin", verifyToken, isAdmin,doctorController.makeUserAdmin);
+router.post("/make-admin", verifyToken, isAdmin,doctorController.toggleUserRole);
 router.get("/user-activity-summary", verifyToken, isAdmin, doctorController.getUserActivitySummary);
+
+router.post("/add-slot", verifyToken, isAdmin, doctorController.addSlotTemplate);
+router.get("/slot-templates", verifyToken, doctorController.getSlotTemplates);
 
 router.post("/send", doctorController.sendWhatsAppMessage);
 

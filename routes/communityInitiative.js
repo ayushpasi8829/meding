@@ -6,6 +6,8 @@ const {
   isAdmin,
   isUser,
 } = require("../middleware/authMiddleware");
+const upload = require("../middleware/upload");
+
 const router = express.Router();
 router.post(
   "/therapyplus/join",
@@ -156,4 +158,11 @@ router.get(
   isAdmin,
   communityInitiativeController.getAllGroupTherapyRegistrations
 );
+
+//events-------------------
+router.post("/event",  verifyToken, isAdmin, upload.single("image"), communityInitiativeController.createEvent);
+router.get("/event", communityInitiativeController.getAllEvents);
+router.get("/event/:id", verifyToken, isAdmin, communityInitiativeController.getEventById);
+router.put("/event/:id", verifyToken, isAdmin, upload.single("image"), communityInitiativeController.updateEvent);
+router.delete("/event/:id", verifyToken, isAdmin, communityInitiativeController.deleteEvent);
 module.exports = router;

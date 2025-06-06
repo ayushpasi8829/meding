@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema({
   selectedPlan: { type: String, default: null },
   otp: { type: String, required: false },
   otpExpiresAt: { type: Date, required: false },
-  isMobileVerified: { type: Boolean, default: false },
+  isEmailVerified: { type: Boolean, default: false },
   therapy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Therapy",

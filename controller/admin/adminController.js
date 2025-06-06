@@ -8,7 +8,7 @@ const Appointment = require("../../models/Appointment");
 const moment = require("moment");
 const ExcelJS = require("exceljs");
 const Notification = require("../../models/Notification");
-
+const SlotTemplate = require("../../models/SlotTemplate");
 //doctor------
 exports.createDoctor = async (req, res) => {
   const {
@@ -642,42 +642,36 @@ exports.deleteBundleType = async (req, res) => {
   }
 };
 
-exports.makeUserAdmin = async (req, res) => {
+exports.toggleUserRole = async (req, res) => {
   try {
     const { userId } = req.body;
 
     if (!userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User ID is required" });
+      return res.status(400).json({ success: false, message: "User ID is required" });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    if (user.role === "admin") {
-      return res
-        .status(400)
-        .json({ success: false, message: "User is already an admin" });
-    }
-
-    user.role = "admin";
+    // Toggle role
+    const newRole = user.role === "admin" ? "user" : "admin";
+    user.role = newRole;
     await user.save();
 
     res.status(200).json({
       success: true,
-      message: `User ${user.name} has been granted admin role`,
+      message: `User ${user.fullname} role changed to ${newRole}`,
       data: user,
     });
   } catch (error) {
-    console.error("Error making user admin:", error.message);
+    console.error("Error toggling user role:", error.message);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+
 
 exports.getUserActivitySummary = async (req, res) => {
   try {
@@ -727,6 +721,66 @@ exports.getUserActivitySummary = async (req, res) => {
     console.error("Error fetching user activity summary:", error);
     res.status(500).json({
       message: "Failed to fetch user activity summary",
+      error: error.message,
+    });
+  }
+};
+
+
+exports.addSlotTemplate = async (req, res) => {
+  try {
+    const { slots } = req.body;
+
+    if (!Array.isArray(slots) || slots.length === 0) {
+      return res.status(400).json({ message: "At least one slot is required." });
+    }
+
+    for (const slot of slots) {
+      if (
+        !slot.startTime ||
+        !slot.endTime ||
+        !/^([01]\d|2[0-3]):([0-5]\d)$/.test(slot.startTime) ||
+        !/^([01]\d|2[0-3]):([0-5]\d)$/.test(slot.endTime)
+      ) {
+        return res.status(400).json({
+          message:
+            "Each slot must have valid startTime and endTime in HH:mm format.",
+        });
+      }
+    }
+
+    const createdSlots = await SlotTemplate.insertMany(
+      slots.map((s) => ({
+        startTime: s.startTime,
+        endTime: s.endTime
+      }))
+    );
+
+    return res.status(201).json({
+      message: "Slot templates created successfully.",
+      data: createdSlots,
+    });
+  } catch (error) {
+    console.error("Error adding slot templates:", error);
+    return res.status(500).json({
+      message: "An error occurred while creating slot templates.",
+      error: error.message,
+    });
+  }
+};
+
+exports.getSlotTemplates = async (req, res) => {
+  try {
+    const templates = await SlotTemplate.find().sort({ startTime: 1 });
+
+    return res.status(200).json({
+      message: "Slot templates fetched successfully.",
+      data: templates,
+    });
+  } catch (error) {
+    console.error("Error fetching slot templates:", error);
+    return res.status(500).json({
+      message: "Error retrieving slot templates.",
       error: error.message,
     });
   }

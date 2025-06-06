@@ -3,6 +3,7 @@ const Appointment = require("../../models/Appointment");
 const User = require("../../models/userModel");
 const sendMessage = require("../../utils/sendMessage");
 const AppointmentFeedback = require("../../models/AppointmentFeedback");
+const FOUNDER_DOCTOR_ID = "681addd510e15243aa97f475";
 
 const addOrUpdateTimeSlots = async (req, res) => {
   try {
@@ -103,25 +104,27 @@ const getThirtyMinSlotsWithBreaks = (req, res) => {
 
 const getAvailableSlots = async (req, res) => {
   try {
-    const { date } = req.query;
+    const { date, founder } = req.query;
 
-    // Enhanced input validation
     if (!date || !date.match(/^\d{4}-\d{2}-\d{2}$/)) {
       return res.status(400).json({
         message: "Valid date is required in 'YYYY-MM-DD' format.",
       });
     }
 
-    // Parse date once to validate it's a real date
     const queryDate = new Date(date);
     if (isNaN(queryDate.getTime())) {
       return res.status(400).json({ message: "Invalid date format." });
     }
 
-    // Run both database queries concurrently with Promise.all
-    // Use select() to fetch only needed fields and lean() for plain JS objects
+    // Check if founder mode is requested
+    const isFounderMode = founder === "true";
+    const doctorFilter = isFounderMode
+      ? { doctor: FOUNDER_DOCTOR_ID }
+      : {};
+
     const [doctorSlotsDocs, appointments] = await Promise.all([
-      DoctorTimeSlot.find({})
+      DoctorTimeSlot.find(doctorFilter)
         .select("doctor slots")
         .populate("doctor", "fullname email")
         .lean(),
@@ -129,34 +132,29 @@ const getAvailableSlots = async (req, res) => {
       Appointment.find({
         date: queryDate,
         status: { $in: ["scheduled", "completed"] },
+        ...(isFounderMode && { doctor: FOUNDER_DOCTOR_ID })
       })
         .select("doctor timeSlot")
         .lean(),
     ]);
 
-    // Create a Map of booked slots for O(1) lookup
     const bookedSlotMap = new Map();
     appointments.forEach((app) => {
-      const key = `${app.doctor.toString()}_${app.timeSlot.startTime}-${
-        app.timeSlot.endTime
-      }`;
+      const key = `${app.doctor.toString()}_${app.timeSlot.startTime}-${app.timeSlot.endTime}`;
       bookedSlotMap.set(key, true);
     });
 
-    // Process all slots and filter available doctors in a single pass
     const slotMap = new Map();
 
     doctorSlotsDocs.forEach((doc) => {
-      if (!doc.doctor) return; // Skip if doctor reference is missing
+      if (!doc.doctor) return;
 
       doc.slots.forEach((slot) => {
         const slotKey = `${slot.startTime}-${slot.endTime}`;
         const bookingKey = `${doc.doctor._id.toString()}_${slotKey}`;
 
-        // Skip already booked slots immediately (early exit)
         if (bookedSlotMap.has(bookingKey)) return;
 
-        // Add doctor to available doctors for this slot
         if (!slotMap.has(slotKey)) {
           slotMap.set(slotKey, {
             startTime: slot.startTime,
@@ -173,11 +171,11 @@ const getAvailableSlots = async (req, res) => {
       });
     });
 
-    // Convert Map to array for response
     const availableSlots = Array.from(slotMap.values());
 
     return res.status(200).json({
       date,
+      founder: isFounderMode,
       availableSlots,
       count: availableSlots.length,
     });
@@ -185,11 +183,11 @@ const getAvailableSlots = async (req, res) => {
     console.error("Error fetching available slots:", error);
     return res.status(500).json({
       message: "An error occurred while fetching available slots.",
-      error:
-        process.env.NODE_ENV === "production" ? "Server error" : error.message,
+      error: process.env.NODE_ENV === "production" ? "Server error" : error.message,
     });
   }
 };
+
 
 function isValidTimeSlot(slot) {
   const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -202,7 +200,7 @@ function isValidTimeSlot(slot) {
   );
 }
 
-const FOUNDER_DOCTOR_ID = "681addd510e15243aa97f475";
+
 
 const autoBookAppointment = async (req, res) => {
   try {

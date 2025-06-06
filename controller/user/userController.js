@@ -168,6 +168,7 @@ exports.updateStep3TherapyDetails = async (req, res) => {
 //---------psychometrics-------------------
 
 exports.savePsychometricStep1 = async (req, res) => {
+  // Destructure all required fields, now including date and timeSlot
   const {
     recommendedByProfessional,
     recommendationDetails,
@@ -175,15 +176,20 @@ exports.savePsychometricStep1 = async (req, res) => {
     symptomsObserved,
     underTreatment,
     ageOfIndividual,
+    date,
+    timeSlot,
   } = req.body;
 
   const userId = req.user.id;
 
+  // Basic required fields validation, now also checking date and timeSlot
   if (
     !userId ||
     !recommendedByProfessional ||
     !underTreatment ||
-    !ageOfIndividual
+    !ageOfIndividual ||
+    !date ||
+    !timeSlot
   ) {
     return res.status(400).json({
       success: false,
@@ -192,6 +198,7 @@ exports.savePsychometricStep1 = async (req, res) => {
   }
 
   try {
+    // Create a new document, including date and timeSlot fields
     const record = new PsychometricAssessment({
       userId,
       recommendedByProfessional,
@@ -201,6 +208,8 @@ exports.savePsychometricStep1 = async (req, res) => {
       symptomsObserved,
       underTreatment,
       ageOfIndividual,
+      date, // Save date field
+      timeSlot, // Save timeSlot field
     });
 
     await record.save();
@@ -228,10 +237,14 @@ exports.submitCorporateWellness = async (req, res) => {
     notSureMessage,
     goals,
     estimatedBudget,
+    date, // Added date
+    timeSlot, // Added timeSlot
   } = req.body;
 
+  // Get userId from authenticated user
   const userId = req.user.id;
 
+  // Validate required fields, now also including date and timeSlot
   if (
     !institutionType ||
     !organizationName ||
@@ -239,7 +252,9 @@ exports.submitCorporateWellness = async (req, res) => {
     !numberOfMembers ||
     !interestedServices ||
     !goals ||
-    !estimatedBudget
+    !estimatedBudget ||
+    !date ||
+    !timeSlot
   ) {
     return res.status(400).json({
       success: false,
@@ -248,6 +263,7 @@ exports.submitCorporateWellness = async (req, res) => {
   }
 
   try {
+    // Create the CorporateWellness record in the database
     const record = await CorporateWellness.create({
       userId,
       institutionType,
@@ -258,14 +274,18 @@ exports.submitCorporateWellness = async (req, res) => {
       notSureMessage: interestedServices === "Not sure" ? notSureMessage : null,
       goals,
       estimatedBudget,
+      date, // Pass date field
+      timeSlot, // Pass timeSlot field
     });
 
+    // Return success response
     return res.status(200).json({
       success: true,
       message: "Corporate wellness information submitted successfully",
       data: record,
     });
   } catch (err) {
+    // Handle errors gracefully
     console.error("Corporate Wellness Error:", err);
     return res.status(500).json({
       success: false,

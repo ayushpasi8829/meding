@@ -10,7 +10,11 @@ const internshipSchema = new mongoose.Schema({
   collegeName: { type: String, required: true },
   internshipLevel: {
     type: String,
-    enum: ["Level 1", "Level 2", "Level 3"],
+    enum: [
+      "Level 1 - Beginner",
+      "Level 2 - Intermediate",
+      "Level 3 - Advanced",
+    ],
     required: true,
   },
   whyChooseYou: { type: String, required: true },
