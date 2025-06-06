@@ -961,7 +961,7 @@ const getAllEvents = async (req, res) => {
       filter.type = req.query.type;
     }
 
-    const events = await CommunityEvent.find(filter).populate("host", "fullname email");
+    const events = await CommunityEvent.find(filter).populate("host", "fullname email").populate("peopleJoined", "fullname email");
 
     res.status(200).json({ success: true, data: events });
   } catch (error) {
