@@ -12,6 +12,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
+app.use('/uploads', express.static('uploads'));
 app.use("/reports", express.static(path.join(__dirname, "reports")));
 // MongoDB Connection
 const MONGO_URI =
@@ -20,8 +21,7 @@ const MONGO_URI =
 
 mongoose
   .connect(MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+    useNewUrlParser: true
   })
   .then(() => console.log("MongoDB Connected"))
   .catch((err) => console.error("MongoDB Connection Error:", err));
@@ -43,8 +43,8 @@ app.use("/api/doctor", session);
 //user route
 const user = require("./routes/user/user");
 const gameanswer = require("./routes/user/game");
-const bundle = require("./routes/user/bundle");
 const appointment = require("./routes/appointmentRoute");
+const bundle = require("./routes/user/bundle");
 app.use("/api/user", user);
 app.use("/api/game", gameanswer);
 app.use("/api/appointment", appointment);

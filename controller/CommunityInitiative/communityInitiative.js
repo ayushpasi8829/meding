@@ -11,6 +11,7 @@ const NotSure = require("../../models/NotSure");
 const GroupTherapySession = require("../../models/GroupTherapySession");
 const GroupTherapyRegistration = require("../../models/GroupTherapyRegistration");
 const CommunityEvent = require("../../models/CommunityEvent");
+const JoinEvent = require("../../models/JoinEvent");
 const mongoose = require("mongoose");
 
 const createVolunteer = async (req, res) => {
@@ -899,21 +900,69 @@ const getAllGroupTherapyRegistrations = async (req, res) => {
 
 const createEvent = async (req, res) => {
   try {
-    const eventData = { ...req.body, host: req.user.id };
-    if (req.file) {
-      eventData.image = req.file.path; // multer handles file upload
+    const {
+      name,
+      type,
+      topic,
+      description,
+      date,
+      meetingLink,
+      status,
+      joiningFees,
+      'timeSlot.startTime': startTime,
+      'timeSlot.endTime': endTime,
+    } = req.body;
+
+    // Validation
+    if (!type) {
+      return res.status(400).json({ success: false, message: "`type` is required." });
     }
+    if (!startTime) {
+      return res.status(400).json({ success: false, message: "`timeSlot.startTime` is required." });
+    }
+    if (!endTime) {
+      return res.status(400).json({ success: false, message: "`timeSlot.endTime` is required." });
+    }
+
+    const eventData = {
+      name,
+      type,
+      topic,
+      description,
+      date,
+      meetingLink,
+      status,
+      joiningFees,
+      host: req.user?.id,
+      timeSlot: {
+        startTime,
+        endTime,
+      },
+    };
+
+    if (req.file) {
+      eventData.image = req.file.path;
+    }
+
     const event = await CommunityEvent.create(eventData);
     res.status(201).json({ success: true, message: "Event created", data: event });
   } catch (error) {
     console.error("Create Event Error:", error);
-    res.status(500).json({ success: false, message: "Server Error" });
+    res.status(500).json({ success: false, message: "Server Error", error: error.message });
   }
 };
 
+
 const getAllEvents = async (req, res) => {
   try {
-    const events = await CommunityEvent.find().populate("host", "fullname email");
+    const filter = {};
+
+    if (req.query.type) {
+      filter.type = req.query.type;
+    }
+
+    const events = await CommunityEvent.find(filter).populate("host", "fullname email");
+
     res.status(200).json({ success: true, data: events });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server Error" });
@@ -932,15 +981,67 @@ const getEventById = async (req, res) => {
 
 const updateEvent = async (req, res) => {
   try {
-    const updateData = req.body;
-    if (req.file) updateData.image = req.file.path;
+    const { id } = req.params; // Event ID from the URL
+    const {
+      name,
+      type,
+      topic,
+      description,
+      date,
+      meetingLink,
+      status,
+      joiningFees,
+      'timeSlot.startTime': startTime,
+      'timeSlot.endTime': endTime,
+    } = req.body;
 
-    const event = await CommunityEvent.findByIdAndUpdate(req.params.id, updateData, { new: true });
-    if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+    // Validation
+    if (!type) {
+      return res.status(400).json({ success: false, message: "`type` is required." });
+    }
+    if (!startTime) {
+      return res.status(400).json({ success: false, message: "`timeSlot.startTime` is required." });
+    }
+    if (!endTime) {
+      return res.status(400).json({ success: false, message: "`timeSlot.endTime` is required." });
+    }
+
+    const eventData = {
+      name,
+      type,
+      topic,
+      description,
+      date,
+      meetingLink,
+      status,
+      joiningFees,
+      timeSlot: {
+        startTime,
+        endTime,
+      },
+    };
+
+   
+    if (req.file) {
+      eventData.image = req.file.path; 
+    } else {
+   
+      const existingEvent = await CommunityEvent.findById(id);
+      if (!existingEvent) {
+        return res.status(404).json({ success: false, message: "Event not found" });
+      }
+      eventData.image = existingEvent.image;
+    }
+
+    const event = await CommunityEvent.findByIdAndUpdate(id, eventData, {
+      new: true, 
+      runValidators: true, 
+    });
 
     res.status(200).json({ success: true, message: "Event updated", data: event });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Server Error" });
+    console.error("Update Event Error:", error);
+    res.status(500).json({ success: false, message: "Server Error", error: error.message });
   }
 };
 
@@ -955,6 +1056,43 @@ const deleteEvent = async (req, res) => {
   }
 };
 
+const joinEvent = async (req, res) => {
+  try {
+    const { eventId } = req.body;
+    const userId = req.user.id;
+
+    const event = await CommunityEvent.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, message: "Event not found" });
+    }
+
+    // Check if already joined
+    const alreadyJoined = await JoinEvent.findOne({ event: eventId, user: userId });
+    if (alreadyJoined) {
+      return res.status(400).json({ success: false, message: "You have already joined this event" });
+    }
+
+    
+    const joinRecord = new JoinEvent({
+      event: eventId,
+      user: userId,
+      eventType: event.type,
+      amountPaid: event.joiningFees || 0,
+      paymentStatus: "pending",
+    });
+
+    await joinRecord.save();
+
+    event.peopleJoined.push(userId);
+    await event.save();
+
+    res.status(200).json({ success: true, message: "Event joined successfully", data: joinRecord });
+
+  } catch (error) {
+    console.error("Join event error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 
 module.exports = {
   createVolunteer,
@@ -969,7 +1107,7 @@ module.exports = {
   createGrouptherapySession,
   getCurrentSession,
   registerForSession,
-  //get apis admin
+  
   getAllVolunteers,
   getAllOrgCampRequests,
   getAllTherapyPlusJoins,
@@ -983,5 +1121,5 @@ module.exports = {
   getAllGroupTherapyRegistrations,
 
 
-  createEvent,getAllEvents,getEventById,updateEvent,deleteEvent
+  createEvent,getAllEvents,getEventById,updateEvent,deleteEvent, joinEvent
 };

@@ -160,9 +160,11 @@ router.get(
 );
 
 //events-------------------
-router.post("/event",  verifyToken, isAdmin, upload.single("image"), communityInitiativeController.createEvent);
-router.get("/event", communityInitiativeController.getAllEvents);
-router.get("/event/:id", verifyToken, isAdmin, communityInitiativeController.getEventById);
-router.put("/event/:id", verifyToken, isAdmin, upload.single("image"), communityInitiativeController.updateEvent);
-router.delete("/event/:id", verifyToken, isAdmin, communityInitiativeController.deleteEvent);
+router.post("/event" ,verifyToken,  isAdmin,  upload.single("image"), communityInitiativeController.createEvent);
+router.get("/event", verifyToken, communityInitiativeController.getAllEvents);
+router.get("/event/:id", verifyToken,  isAdmin, communityInitiativeController.getEventById);
+router.put("/event/:id", verifyToken,  isAdmin, upload.single("image"), communityInitiativeController.updateEvent);
+router.delete("/event/:id", verifyToken,  isAdmin, communityInitiativeController.deleteEvent);
+
+router.post("/join-event", verifyToken,  isUser, communityInitiativeController.joinEvent);
 module.exports = router;

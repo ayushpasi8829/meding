@@ -298,27 +298,38 @@ exports.login = async (req, res) => {
 };
 
 exports.gameForm = async (req, res) => {
-  const { fullname, email, mobile, location } = req.body;
+  const {
+    fullname,
+    email,
+    mobile,
+    location,
+    role = "user",
+    reason,
+    gender,
+    countryCode,
+  } = req.body;
+
   console.log("Form Data Received:", {
     fullname,
     email,
     mobile,
     location,
+    role,
+    reason,
+    gender,
+    countryCode,
   });
 
+  // Validate required fields
   if (!fullname || !email || !mobile || !location) {
     return res.status(400).json({
       success: false,
-      message: "All fields are required",
+      message: "fullname, email, mobile, location, and role are required",
     });
   }
 
   try {
-    let user = await User.findOne({ mobile });
-
-    // const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otp = 123456;
-    const otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    let user = await User.findOne({ email });
 
     if (!user) {
       user = new User({
@@ -326,37 +337,42 @@ exports.gameForm = async (req, res) => {
         email,
         mobile,
         location,
+        role,
+        reason,
+        gender,
+        countryCode,
         isMobileVerified: false,
-        otp,
-        otpExpiresAt,
-        role: "user",
       });
     } else {
-      // Update OTP for existing but unverified users
-      user.otp = otp;
-      user.otpExpiresAt = otpExpiresAt;
-      // Optionally update other fields if you want to allow edits before verification
+      // Optionally update user info
       user.fullname = fullname;
-      user.email = email;
+      user.mobile = mobile;
       user.location = location;
+      user.role = role;
+      user.reason = reason;
+      user.gender = gender;
+      user.countryCode = countryCode;
     }
 
     await user.save();
 
-    // Send OTP via SMS here
+    // Generate a JWT token using email as payload
+    const token = jwt.sign({ id: user._id, role: user.role }, "SECRET_KEY");
 
     res.status(201).json({
       success: true,
-      message: "Registration successful. OTP sent to your mobile.",
+      message: "Registration successful. Token generated.",
       data: {
         fullname: user.fullname,
         email: user.email,
         mobile: user.mobile,
         location: user.location,
-
-        otpExpiresAt: user.otpExpiresAt,
-        isMobileVerified: user.isMobileVerified,
         role: user.role,
+        reason: user.reason,
+        gender: user.gender,
+        countryCode: user.countryCode,
+        isEmailVerified: user.isEmailVerified,
+        token: token,
       },
     });
   } catch (err) {

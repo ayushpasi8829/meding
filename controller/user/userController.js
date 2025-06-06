@@ -446,7 +446,6 @@ exports.getTodaySession = async (req, res) => {
     const todaySession = await Appointment.find({
       patient: userId,
       date: { $gte: todayStart, $lte: todayEnd },
-      status: "scheduled",
     }).populate("doctor", "name email");
 
     if (!todaySession) {
@@ -493,7 +492,7 @@ exports.getUpcomingSession = async (req, res) => {
     const userId = req.user.id;
     const now = new Date();
 
-    const upcomingSession = await Appointment.findOne({
+    const upcomingSession = await Appointment.find({
       patient: userId,
       date: { $gt: now },
       status: "scheduled",
