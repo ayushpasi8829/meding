@@ -43,10 +43,12 @@ app.use("/api/doctor", session);
 //user route
 const user = require("./routes/user/user");
 const gameanswer = require("./routes/user/game");
+const bundle = require("./routes/user/bundle");
 const appointment = require("./routes/appointmentRoute");
 app.use("/api/user", user);
 app.use("/api/game", gameanswer);
 app.use("/api/appointment", appointment);
+app.use("/api/user/bundle", bundle);
 
 //community initiative route
 const communityInitiative = require("./routes/communityInitiative");
