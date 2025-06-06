@@ -443,7 +443,7 @@ exports.getTodaySession = async (req, res) => {
     const todayStart = moment().startOf("day").toDate();
     const todayEnd = moment().endOf("day").toDate();
 
-    const todaySession = await Appointment.findOne({
+    const todaySession = await Appointment.find({
       patient: userId,
       date: { $gte: todayStart, $lte: todayEnd },
       status: "scheduled",
